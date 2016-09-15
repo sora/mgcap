@@ -19,7 +19,7 @@ static void usage(void)
 }
 
 /* From linux/Documentation/networking/timestamping/hwtstamp_config.c */
-static int hwtstamp_config_set(const char *ifname, const int tx_type, const int rx_filter)
+static int hwtstamp_config_set(const char *ifname, int tx_type, int rx_filter)
 {
 	struct hwtstamp_config config;
 	int sock, ret = 0;
