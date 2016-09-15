@@ -39,15 +39,12 @@
  * +-----------------------+
  */
 
-#define RING_SIZE_MB       16
-
-#define MGC_MAGIC          0x3776
-#define MGC_HDR_SIZE       4
-#define RING_SIZE          (RING_SIZE_MB*1024*1024)        // 2^n
-#define MAX_PKT_SIZE       1600
-#define MIN_PKT_SIZE       40
-#define NBULK_PKT          1
-#define RING_ALMOST_FULL   (MAX_PKT_SIZE*2)
+#define MGC_HDR_PKTLEN_SIZE       2
+#define MGC_HDR_TSTAMP_SIZE       8
+#define MAX_PKT_SIZE              96
+#define RING_SIZE                 (1<<19)        // 2^n
+#define NBULK_PKT                 1
+#define RING_ALMOST_FULL          (MAX_PKT_SIZE*2)
 
 //#define ALIGN(x,a) __ALIGN_MASK(x,(typeof(x))(a)-1)
 //#define __ALIGN_MASK(x,mask) (((x)+(mask))&~(mask))

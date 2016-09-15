@@ -6,6 +6,8 @@
 #undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#define MGC_SNAPLEN  96
+
 /* ioctl cmd number */
 #define MGCTXSYNC    10
 #define MGCRXSYNC    11
