@@ -5,8 +5,9 @@
 #include <linux/smp.h>
 #include <linux/err.h>
 #include <linux/rtnetlink.h>
-#include <linux/vmalloc.h>
 #include <linux/wait.h>
+
+#include <linux/kthread.h>
 
 #include "mgcap_ring.h"
 #include "mgcap_rx.h"
@@ -15,7 +16,9 @@
 #define MGCAP_VERSION  "0.0.0"
 
 /* Module parameters, defaults. */
+static int debug = 0;
 static char *ifname = "eth0";
+static int rxbuf_size = 19;
 
 /* Global variables */
 static struct mgc_dev *mgc;
@@ -72,7 +75,7 @@ static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	int copy_len, available_read_len;
-	struct mgc_ring *rx = &mgc->rxring;
+	struct mgc_ring *rx = &mgc->rx->buf;
 
 	if (ring_empty(rx))
 		return 0;
@@ -121,53 +124,64 @@ mgcap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 static int __init
 mgcap_init_module(void)
 {
-	int rc = 0, err;
+	unsigned int malloc_ring_size;
+	char pathdev[IFNAMSIZ];
+	int rc;
 
 	pr_info("mgcap (v%s) is loaded\n", MGCAP_VERSION);
 
+	/* malloc mgc_dev */
 	mgc = kmalloc(sizeof(struct mgc_dev), GFP_KERNEL);
 	if (mgc == 0) {
 		pr_err("fail to kmalloc: *mgc_dev\n");
 		goto err;
 	}
 
+	/* malloc mgc_dev->rx */
+	mgc->rx = kmalloc(sizeof(struct rxring), GFP_KERNEL);
+	if (mgc->rx == 0) {
+		pr_err("fail to kmalloc: *mgc_dev->rx\n");
+		goto err;
+	}
+
+	/* malloc mgc_dev->rx->buf */
+	malloc_ring_size = RING_SIZE + MAX_PKT_SIZE * NBULK_PKT;
+	if ((mgc->rx->buf.start = kmalloc(malloc_ring_size, GFP_KERNEL)) == 0) {
+		pr_info("fail to kmalloc\n");
+		goto err;
+	}
+	mgc->rx->buf.end   = mgc->rx->buf.start + RING_SIZE - 1;
+	mgc->rx->buf.write = mgc->rx->buf.start;
+	mgc->rx->buf.read  = mgc->rx->buf.start;
+	mgc->rx->buf.mask  = RING_SIZE - 1;
+
+	pr_info("st: %p, wr: %p, rd: %p, end: %p\n",
+		mgc->rx->buf.start, mgc->rx->buf.write,
+		mgc->rx->buf.read,  mgc->rx->buf.end);
+
+	/* mgc->dev */
 	mgc->dev = dev_get_by_name(&init_net, ifname);
 	if (!mgc->dev) {
 		pr_err("Could not find %s\n", ifname);
 		goto err;
 	}
 
-	mgc->cpu = smp_processor_id();
-	pr_info("cpuid: %d\n", mgc->cpu);
-
-	// register
-	rtnl_lock();
-	err = netdev_rx_handler_register(mgc->dev, mgc_handle_frame, mgc);
-	rtnl_unlock();
-	if (err) {
-		pr_err("%s failed to register rx_handler\n", ifname);
-		goto err;
-	}
-
-	err = misc_register(&mgcap_dev);
-	if (err) {
+	/* register character device */
+	sprintf(pathdev, "%s/%s", DRV_NAME, ifname);
+	rc = misc_register(&mgcap_dev);
+	if (rc) {
 		pr_err("fail to misc_register (MISC_DYNAMIC_MINOR)\n");
 		goto err;
 	}
 
-	/* tmp: Set receive buffer */
-
-	if ((mgc->rxring.start = vmalloc(RING_SIZE + MAX_PKT_SIZE * NBULK_PKT)) == 0) {
-		pr_info("fail to vmalloc\n");
+	// netdev_rx_handler_register
+	rtnl_lock();
+	rc = netdev_rx_handler_register(mgc->dev, mgc_handle_frame, mgc);
+	rtnl_unlock();
+	if (rc) {
+		pr_err("%s failed to register rx_handler\n", ifname);
 		goto err;
 	}
-	mgc->rxring.end   = mgc->rxring.start + RING_SIZE - 1;
-	mgc->rxring.write = mgc->rxring.start;
-	mgc->rxring.read  = mgc->rxring.start;
-	mgc->rxring.mask  = RING_SIZE - 1;
-
-	pr_info("st: %p, wr: %p, rd: %p, end: %p\n",
-			mgc->rxring.start, mgc->rxring.write, mgc->rxring.read, mgc->rxring.end);
 
 	return rc;
 
@@ -190,9 +204,15 @@ mgcap_exit(void)
 	misc_deregister(&mgcap_dev);
 
 	/* free rx ring buffer */
-	if (mgc->rxring.start) {
-		vfree(mgc->rxring.start);
-		mgc->rxring.start = NULL;
+	if (mgc->rx->buf.start) {
+		kfree(mgc->rx->buf.start);
+		mgc->rx->buf.start = NULL;
+	}
+
+	/* free rx ring buffer */
+	if (mgc->rx) {
+		kfree(mgc->rx);
+		mgc->rx = NULL;
 	}
 
 	if (mgc) {
@@ -213,10 +233,14 @@ mgcap_exit_module(void)
 module_exit(mgcap_exit_module);
 
 MODULE_AUTHOR("Yohei Kuga <sora@haeena.net>");
-MODULE_DESCRIPTION("RX Hook");
+MODULE_DESCRIPTION("MGCAP device");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(MGCAP_VERSION);
 
+module_param(debug, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(debug, "debug flag");
 module_param(ifname, charp, S_IRUGO);
 MODULE_PARM_DESC(ifname, "Target network device name");
+module_param(rxbuf_size, int, S_IRUGO);
+MODULE_PARM_DESC(rxbuf_size, "RX ring size on each received packet (1<<rxbuf_size)");
 
