@@ -7,8 +7,6 @@
 #include <linux/rtnetlink.h>
 #include <linux/wait.h>
 
-#include <linux/kthread.h>
-
 #include "mgcap_ring.h"
 #include "mgcap_rx.h"
 #include "mgcap.h"
@@ -45,7 +43,7 @@ static struct file_operations mgcap_fops = {
 
 static struct miscdevice mgcap_dev = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "mgcap",
+	.name = DRV_NAME,
 	.fops = &mgcap_fops,
 };
 
@@ -75,7 +73,7 @@ static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	int copy_len, available_read_len;
-	struct mgc_ring *rx = &mgc->rx->buf;
+	struct mgc_ring *rx = &mgc->rx[0].buf;
 
 	if (ring_empty(rx))
 		return 0;
@@ -126,7 +124,7 @@ mgcap_init_module(void)
 {
 	unsigned int malloc_ring_size;
 	char pathdev[IFNAMSIZ];
-	int rc;
+	int rc, cpu, i;
 
 	pr_info("mgcap (v%s) is loaded\n", MGCAP_VERSION);
 
@@ -137,27 +135,37 @@ mgcap_init_module(void)
 		goto err;
 	}
 
+	mgc->num_cpus = num_online_cpus();
+	pr_info("mgc->num_cpus: %d\n", mgc->num_cpus);
+
 	/* malloc mgc_dev->rx */
-	mgc->rx = kmalloc(sizeof(struct rxring), GFP_KERNEL);
+	mgc->rx = kmalloc(sizeof(struct rxring) * mgc->num_cpus, GFP_KERNEL);
 	if (mgc->rx == 0) {
 		pr_err("fail to kmalloc: *mgc_dev->rx\n");
 		goto err;
 	}
-
+	
 	/* malloc mgc_dev->rx->buf */
-	malloc_ring_size = RING_SIZE + MAX_PKT_SIZE * NBULK_PKT;
-	if ((mgc->rx->buf.start = kmalloc(malloc_ring_size, GFP_KERNEL)) == 0) {
-		pr_info("fail to kmalloc\n");
-		goto err;
-	}
-	mgc->rx->buf.end   = mgc->rx->buf.start + RING_SIZE - 1;
-	mgc->rx->buf.write = mgc->rx->buf.start;
-	mgc->rx->buf.read  = mgc->rx->buf.start;
-	mgc->rx->buf.mask  = RING_SIZE - 1;
+	i = 0;
+	for_each_online_cpu(cpu) {
+		mgc->rx[i].cpuid = cpu;
 
-	pr_info("st: %p, wr: %p, rd: %p, end: %p\n",
-		mgc->rx->buf.start, mgc->rx->buf.write,
-		mgc->rx->buf.read,  mgc->rx->buf.end);
+		malloc_ring_size = RING_SIZE + MAX_PKT_SIZE * NBULK_PKT;
+		if ((mgc->rx[i].buf.start = kmalloc(malloc_ring_size, GFP_KERNEL)) == 0) {
+			pr_err("fail to kmalloc: *mgc_dev->rx[%d].buf, cpu=%d\n", i, cpu);
+			goto err;
+		}
+		mgc->rx[i].buf.end   = mgc->rx[i].buf.start + RING_SIZE - 1;
+		mgc->rx[i].buf.write = mgc->rx[i].buf.start;
+		mgc->rx[i].buf.read  = mgc->rx[i].buf.start;
+		mgc->rx[i].buf.mask  = RING_SIZE - 1;
+		pr_info("cpu=%d, rxbuf[%d], st: %p, wr: %p, rd: %p, end: %p\n",
+			cpu, i,
+			mgc->rx[i].buf.start, mgc->rx[i].buf.write,
+			mgc->rx[i].buf.read,  mgc->rx[i].buf.end);
+
+		++i;
+	}
 
 	/* mgc->dev */
 	mgc->dev = dev_get_by_name(&init_net, ifname);
@@ -168,6 +176,7 @@ mgcap_init_module(void)
 
 	/* register character device */
 	sprintf(pathdev, "%s/%s", DRV_NAME, ifname);
+	mgcap_dev.name = pathdev;
 	rc = misc_register(&mgcap_dev);
 	if (rc) {
 		pr_err("fail to misc_register (MISC_DYNAMIC_MINOR)\n");
@@ -195,6 +204,8 @@ module_init(mgcap_init_module);
 void
 mgcap_exit(void)
 {
+	int i;
+
 	if (mgc->dev) {
 		rtnl_lock();
 		netdev_rx_handler_unregister(mgc->dev);
@@ -204,12 +215,14 @@ mgcap_exit(void)
 	misc_deregister(&mgcap_dev);
 
 	/* free rx ring buffer */
-	if (mgc->rx->buf.start) {
-		kfree(mgc->rx->buf.start);
-		mgc->rx->buf.start = NULL;
+	for (i = 0; i < mgc->num_cpus; i++) {
+		if (mgc->rx[i].buf.start) {
+			kfree(mgc->rx[i].buf.start);
+			mgc->rx[i].buf.start = NULL;
+		}
 	}
 
-	/* free rx ring buffer */
+	/* free rx ring buffers */
 	if (mgc->rx) {
 		kfree(mgc->rx);
 		mgc->rx = NULL;

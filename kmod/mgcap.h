@@ -15,28 +15,21 @@ printk("[%s]: start: %p, end: %p, rd: %p, wr: %p\n", \
 #define DRV_NAME     "mgcap"
 
 #define MGC_SNAPLEN  96
+#define MAX_CPUS     20
 
 /* ioctl cmd number */
 #define MGCTXSYNC    10
 #define MGCRXSYNC    11
 
-struct rxthread {
-	unsigned int cpu;			/* cpu id that the thread is runnig */
-	struct task_struct *tsk;		/* xmit kthread */
-	struct completion start_done;
-	struct mgc_ring buf;
-};
-
 struct rxring {
-	unsigned int cpu;
+	unsigned int cpuid;
 	struct mgc_ring buf;
-	struct list_head list;
 };
 
 struct mgc_dev {
 	struct net_device *dev;
 
-	struct rxthread rxth;
+	unsigned int num_cpus;
 
 	struct rxring *rx;
 };

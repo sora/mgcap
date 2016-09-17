@@ -20,7 +20,7 @@ rx_handler_result_t mgc_handle_frame(struct sk_buff **pskb)
 	struct skb_shared_hwtstamps *hwtstamps = skb_hwtstamps(skb);
 
 	dev = rcu_dereference(skb->dev->rx_handler_data);
-	rx = &dev->rx->buf;
+	rx = &dev->rx[0].buf;
 
 	pktlen = skb->mac_len + skb->len;
 
