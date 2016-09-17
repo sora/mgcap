@@ -3,7 +3,7 @@ BUILD_DIR := $(shell pwd)
 VERBOSE = 0
 
 obj-m := mgcap.o
-mgcap-objs := mgcap_main.o mgcap_rx.o
+mgcap-objs := mgcap_ring.o mgcap_rx.o mgcap_main.o
 
 all:
 	make -C $(KERNELSRCDIR) M=$(BUILD_DIR) V=$(VERBOSE) modules

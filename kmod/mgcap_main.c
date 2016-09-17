@@ -122,7 +122,6 @@ mgcap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 static int __init
 mgcap_init_module(void)
 {
-	unsigned int malloc_ring_size;
 	char pathdev[IFNAMSIZ];
 	int rc, cpu, i;
 
@@ -150,15 +149,10 @@ mgcap_init_module(void)
 	for_each_online_cpu(cpu) {
 		mgc->rx[i].cpuid = cpu;
 
-		malloc_ring_size = RING_SIZE + MAX_PKT_SIZE * NBULK_PKT;
-		if ((mgc->rx[i].buf.start = kmalloc(malloc_ring_size, GFP_KERNEL)) == 0) {
-			pr_err("fail to kmalloc: *mgc_dev->rx[%d].buf, cpu=%d\n", i, cpu);
-			goto err;
+		rc = mgc_ring_malloc(&mgc->rx[i].buf, cpu);
+		if (rc < 0) {
+			pr_err("fail to kmalloc: *mgc_ring[%d], cpu=%d\n", i, cpu);
 		}
-		mgc->rx[i].buf.end   = mgc->rx[i].buf.start + RING_SIZE - 1;
-		mgc->rx[i].buf.write = mgc->rx[i].buf.start;
-		mgc->rx[i].buf.read  = mgc->rx[i].buf.start;
-		mgc->rx[i].buf.mask  = RING_SIZE - 1;
 		pr_info("cpu=%d, rxbuf[%d], st: %p, wr: %p, rd: %p, end: %p\n",
 			cpu, i,
 			mgc->rx[i].buf.start, mgc->rx[i].buf.write,

@@ -45,6 +45,7 @@
 #define RING_SIZE                 (1<<19)        // 2^n
 #define NBULK_PKT                 1
 #define RING_ALMOST_FULL          (MAX_PKT_SIZE*2)
+#define RING_MALLOC_SIZE          (RING_SIZE + (MAX_PKT_SIZE * NBULK_PKT))
 
 //#define ALIGN(x,a) __ALIGN_MASK(x,(typeof(x))(a)-1)
 //#define __ALIGN_MASK(x,mask) (((x)+(mask))&~(mask))
@@ -94,8 +95,7 @@ static inline void ring_read_next(struct mgc_ring *r, uint32_t size)
 }
 
 
-int ring_init(struct mgc_ring *);
-void ring_exit(struct mgc_ring *);
+int mgc_ring_malloc(struct mgc_ring *, int cpu);
 
 #endif /* _MGCAP_RING_H_ */
 
