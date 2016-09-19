@@ -22,17 +22,20 @@ printk("[%s]: start: %p, end: %p, rd: %p, wr: %p\n", \
 #define MGCRXSYNC    11
 
 struct rxring {
-	unsigned int cpuid;
 	struct mgc_ring buf;
+	uint8_t cpuid;
 };
 
 struct mgc_dev {
 	struct net_device *dev;
 
-	unsigned int num_cpus;
+	uint8_t num_cpus;
 
 	struct rxring *rx;
+
+	struct rxring *cur_rxring;
 };
 
 #endif /* _MGCAP_H_ */
+
 

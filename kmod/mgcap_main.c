@@ -73,25 +73,31 @@ static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	int copy_len, available_read_len;
-	struct mgc_ring *rx = &mgc->rx[0].buf;
+	struct mgc_ring *rxbuf = &mgc->cur_rxring->buf;
+	uint8_t ring_budget = mgc->num_cpus;
 
-	if (ring_empty(rx))
-		return 0;
+	while(--ring_budget) {
+		if (ring_empty(rxbuf)) {
+			rxbuf = next_ring(rxbuf);
+			continue;
+		}
 
-	available_read_len = ring_free_count(rx);
-	if (count > available_read_len)
-		copy_len = available_read_len;
-	else
-		copy_len = count;
+		available_read_len = ring_free_count(rxbuf);
+		if (count > available_read_len)
+			copy_len = available_read_len;
+		else
+			copy_len = count;
 
-	if (copy_to_user(buf, rx->read, copy_len)) {
-		pr_info("copy_to_user failed\n");
-		return -EFAULT;
+		if (copy_to_user(buf, rxbuf->read, copy_len)) {
+			pr_info("copy_to_user failed\n");
+			return -EFAULT;
+		}
+		ring_read_next(rxbuf, copy_len);
+
+		return copy_len;
 	}
 
-	ring_read_next(rx, copy_len);
-
-	return copy_len;
+	return 0;
 }
 
 static long
@@ -148,11 +154,12 @@ mgcap_init_module(void)
 	i = 0;
 	for_each_online_cpu(cpu) {
 		mgc->rx[i].cpuid = cpu;
-
 		rc = mgc_ring_malloc(&mgc->rx[i].buf, cpu);
 		if (rc < 0) {
 			pr_err("fail to kmalloc: *mgc_ring[%d], cpu=%d\n", i, cpu);
+			goto err;
 		}
+		mgc->rx[i].buf.next = &mgc->rx[(i + 1) % mgc->num_cpus].buf;
 		pr_info("cpu=%d, rxbuf[%d], st: %p, wr: %p, rd: %p, end: %p\n",
 			cpu, i,
 			mgc->rx[i].buf.start, mgc->rx[i].buf.write,
@@ -160,6 +167,11 @@ mgcap_init_module(void)
 
 		++i;
 	}
+
+	/* mgc_dev->cur_rxring */
+	mgc->cur_rxring = &mgc->rx[0];
+	pr_info("mgc->cur_ring: %p\n", mgc->cur_rxring);
+
 
 	/* mgc->dev */
 	mgc->dev = dev_get_by_name(&init_net, ifname);

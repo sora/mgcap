@@ -56,6 +56,7 @@ struct mgc_ring {
 	uint8_t *start;
 	uint8_t *end;
 	uint32_t mask;
+	struct mgc_ring *next;
 };
 
 static inline uint32_t ring_count(const struct mgc_ring *r)
@@ -92,6 +93,11 @@ static inline void ring_read_next(struct mgc_ring *r, uint32_t size)
 	if (r->read > r->end) {
 		r->read = r->start;
 	}
+}
+
+static inline struct mgc_ring *next_ring(const struct mgc_ring *r)
+{
+	return r->next;
 }
 
 
