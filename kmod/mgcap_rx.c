@@ -13,24 +13,19 @@ rx_handler_result_t mgc_handle_frame(struct sk_buff **pskb)
 {
 	rx_handler_result_t res = RX_HANDLER_CONSUMED;
 	struct sk_buff *skb = *pskb;
-//	unsigned short ethhdr_len, data_len;
-	unsigned short pktlen;
-	struct mgc_dev *dev;
-	struct mgc_ring *rx;
+
+	struct mgc_dev *dev = rcu_dereference(skb->dev->rx_handler_data);
+	struct mgc_ring *rxbuf = &dev->rx[0].buf;
+
 	struct skb_shared_hwtstamps *hwtstamps = skb_hwtstamps(skb);
+	unsigned short pktlen = skb->mac_len + skb->len;
 
-	dev = rcu_dereference(skb->dev->rx_handler_data);
-	rx = &dev->rx[0].buf;
-
-	pktlen = skb->mac_len + skb->len;
-
-	*(unsigned short *)rx->write = pktlen;
-	rx->write += MGC_HDR_PKTLEN_SIZE;
-	*(unsigned long *)rx->write = hwtstamps->hwtstamp.tv64;
-	rx->write += MGC_HDR_TSTAMP_SIZE;
-	memcpy(rx->write, skb_mac_header(skb),
+	*(unsigned short *)rxbuf->write = pktlen;
+	*(unsigned long *)(rxbuf->write + MGC_HDR_PKTLEN_SIZE) = hwtstamps->hwtstamp.tv64;
+	memcpy((rxbuf->write + MGC_HDR_PKTLEN_SIZE + MGC_HDR_TSTAMP_SIZE), skb_mac_header(skb),
 		(pktlen > MGC_SNAPLEN) ? MGC_SNAPLEN : (int)pktlen);
-	ring_write_next(rx, MGC_SNAPLEN);
+
+	ring_write_next(rxbuf, MGC_HDR_PKTLEN_SIZE + MGC_HDR_TSTAMP_SIZE + MGC_SNAPLEN);
 
 /*
 	ethhdr_len = (unsigned short)skb->mac_len;

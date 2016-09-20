@@ -81,7 +81,7 @@ static inline bool ring_almost_full(const struct mgc_ring *r)
 
 static inline void ring_write_next(struct mgc_ring *r, uint32_t size)
 {
-	r->write += size;
+	r->write += ALIGN(size, 4);
 	if (r->write > r->end) {
 		r->write = r->start;
 	}
@@ -89,7 +89,7 @@ static inline void ring_write_next(struct mgc_ring *r, uint32_t size)
 
 static inline void ring_read_next(struct mgc_ring *r, uint32_t size)
 {
-	r->read += size;
+	r->read += ALIGN(size, 4);
 	if (r->read > r->end) {
 		r->read = r->start;
 	}
