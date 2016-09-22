@@ -2,8 +2,12 @@
 A pcap capturing device for Monitoring Metrics
 
 ```bash
-$ make
-$ sudo insmod kmod/mgcap.ko ifname="eth0"
+$ cd kmod; make
+$ sudo insmod kmod/mgcap.ko ifname="lo"
 $ dmesg
+$ ping 127.0.0.1 &
+$ cd src/mgdump; make
+$ chmod 777 /dev/mgcap/lo
+$ ./mgdump lo 
 $ sudo rmmod mgcap
 ```
