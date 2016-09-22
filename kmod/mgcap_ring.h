@@ -41,14 +41,13 @@
 
 #define MGC_HDR_PKTLEN_SIZE       2
 #define MGC_HDR_TSTAMP_SIZE       8
-#define MAX_PKT_SIZE              96
-#define RING_SIZE                 (1<<19)        // 2^n
+#define MGC_HDR_SIZE              MGC_HDR_PKTLEN_SIZE + MGC_HDR_TSTAMP_SIZE
+#define MGC_PKT_SNAPLEN           96
+#define MGC_DATASLOT_SIZE         128
+#define RING_SIZE                 (1 << 19)        // 2^n
 #define NBULK_PKT                 1
-#define RING_ALMOST_FULL          (MAX_PKT_SIZE*2)
-#define RING_MALLOC_SIZE          (RING_SIZE + (MAX_PKT_SIZE * NBULK_PKT))
-
-//#define ALIGN(x,a) __ALIGN_MASK(x,(typeof(x))(a)-1)
-//#define __ALIGN_MASK(x,mask) (((x)+(mask))&~(mask))
+#define RING_ALMOST_FULL          (MGC_DATASLOT_SIZE * 2)
+#define RING_MALLOC_SIZE          (RING_SIZE + (MGC_DATASLOT_SIZE * NBULK_PKT))
 
 struct mgc_ring {
 	uint8_t *write;
@@ -79,17 +78,19 @@ static inline bool ring_almost_full(const struct mgc_ring *r)
 	return !!(ring_free_count(r) < RING_ALMOST_FULL);
 }
 
-static inline void ring_write_next(struct mgc_ring *r, uint32_t size)
+static inline void ring_write_next(struct mgc_ring *r, size_t size)
 {
-	r->write += ALIGN(size, 4);
+//	r->write += ALIGN(size, 4);
+	r->write += size;
 	if (r->write > r->end) {
 		r->write = r->start;
 	}
 }
 
-static inline void ring_read_next(struct mgc_ring *r, uint32_t size)
+static inline void ring_read_next(struct mgc_ring *r, size_t size)
 {
-	r->read += ALIGN(size, 4);
+//	r->read += ALIGN(size, 4);
+	r->read += size;
 	if (r->read > r->end) {
 		r->read = r->start;
 	}
