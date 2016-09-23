@@ -68,6 +68,9 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
+		if (pktlen > 96)
+			pktlen = 96;
+
 		if (read(fd, ibuf, pktlen) <= 0)
 			continue;
 		sprintf(obuf, "%02X%02X%02X%02X%02X%02X %02X%02X%02X%02X%02X%02X %02X%02X",
