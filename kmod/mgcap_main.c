@@ -76,7 +76,7 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 	struct mgc_ring *rxbuf = &mgc->cur_rxring->buf;
 	uint8_t ring_budget = mgc->num_cpus;
 
-	while(--ring_budget) {
+	while(ring_budget--) {
 		if (ring_empty(rxbuf)) {
 			rxbuf = next_ring(rxbuf);
 			continue;
