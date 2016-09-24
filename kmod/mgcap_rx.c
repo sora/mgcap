@@ -25,7 +25,7 @@ rx_handler_result_t mgc_handle_frame(struct sk_buff **pskb)
 	*(uint64_t *)(rxbuf->write + MGC_HDR_PKTLEN_SIZE) = hwtstamps->hwtstamp.tv64;
 	memcpy((rxbuf->write + MGC_HDR_SIZE), skb_mac_header(skb), copylen);
 
-	ring_write_next(rxbuf, MGC_DATASLOT_SIZE);
+	ring_write_next(rxbuf, MGC_HDR_SIZE+copylen);
 
 /*
 	ethhdr_len = (unsigned short)skb->mac_len;
