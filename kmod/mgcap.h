@@ -37,11 +37,14 @@ struct mgc_dev {
 	struct rxring *cur_rxring;
 };
 
+/* Global variables */
+extern struct mgc_dev *mgc;
+
+
 static inline struct rxring *next_rxring(const struct rxring *rx)
 {
 	return rx->next;
 }
-
 
 #endif /* _MGCAP_H_ */
 

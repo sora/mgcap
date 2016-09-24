@@ -7,9 +7,8 @@
 #include <linux/rtnetlink.h>
 #include <linux/wait.h>
 
-#include "mgcap_ring.h"
-#include "mgcap_rx.h"
 #include "mgcap.h"
+#include "mgcap_rx.h"
 
 #define MGCAP_VERSION  "0.0.0"
 
@@ -19,7 +18,7 @@ static char *ifname = "eth0";
 static int rxbuf_size = 19;
 
 /* Global variables */
-static struct mgc_dev *mgc;
+struct mgc_dev *mgc;
 
 
 static int mgcap_open(struct inode *, struct file *);
@@ -35,7 +34,7 @@ static ssize_t mgcap_read(struct file *, char __user *, size_t, loff_t *);
 static struct file_operations mgcap_fops = {
 	.owner = THIS_MODULE,
 	.open = mgcap_open,
-	.read = mgcap_read,     // tmp
+	.read = mgcap_read,
 	.poll = mgcap_poll,
 	.unlocked_ioctl = mgcap_ioctl,
 	.release = mgcap_release,
@@ -77,15 +76,11 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 
 	uint8_t ring_budget = mgc->num_cpus;
 
-//	pr_info("cur_rxring\n");
-
 	while(ring_budget--) {
 		if (ring_empty(&rx->buf)) {
-	//		pr_info("next_ring: ring_budget=%d\n", ring_budget);
 			rx = next_rxring(rx);
 			continue;
 		}
-	//	pr_info("run_ring: ring_budget=%d\n", ring_budget);
 
 		available_read_len = ring_free_count(&rx->buf);
 		if (count > available_read_len)
