@@ -73,30 +73,36 @@ static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	int copy_len, available_read_len;
-	struct mgc_ring *rxbuf = &mgc->cur_rxring->buf;
+	struct rxring *rx = mgc->cur_rxring;
+
 	uint8_t ring_budget = mgc->num_cpus;
 
+//	pr_info("cur_rxring\n");
+
 	while(ring_budget--) {
-		if (ring_empty(rxbuf)) {
-			rxbuf = next_ring(rxbuf);
+		if (ring_empty(&rx->buf)) {
+	//		pr_info("next_ring: ring_budget=%d\n", ring_budget);
+			rx = next_rxring(rx);
 			continue;
 		}
+	//	pr_info("run_ring: ring_budget=%d\n", ring_budget);
 
-		available_read_len = ring_free_count(rxbuf);
+		available_read_len = ring_free_count(&rx->buf);
 		if (count > available_read_len)
 			copy_len = available_read_len;
 		else
 			copy_len = count;
 
-		if (copy_to_user(buf, rxbuf->read, copy_len)) {
+		if (copy_to_user(buf, rx->buf.read, copy_len)) {
 			pr_info("copy_to_user failed\n");
 			return -EFAULT;
 		}
-		ring_read_next(rxbuf, copy_len);
+		ring_read_next(&rx->buf, copy_len);
 
 		return copy_len;
 	}
 
+	mgc->cur_rxring = rx;
 	return 0;
 }
 
@@ -144,8 +150,8 @@ mgcap_init_module(void)
 	pr_info("mgc->num_cpus: %d\n", mgc->num_cpus);
 
 	/* malloc mgc_dev->rx */
-	mgc->rx = kmalloc(sizeof(struct rxring) * mgc->num_cpus, GFP_KERNEL);
-	if (mgc->rx == 0) {
+	mgc->rxrings = kmalloc(sizeof(struct rxring) * mgc->num_cpus, GFP_KERNEL);
+	if (mgc->rxrings == 0) {
 		pr_err("fail to kmalloc: *mgc_dev->rx\n");
 		goto err;
 	}
@@ -153,23 +159,23 @@ mgcap_init_module(void)
 	/* malloc mgc_dev->rx->buf */
 	i = 0;
 	for_each_online_cpu(cpu) {
-		mgc->rx[i].cpuid = cpu;
-		rc = mgc_ring_malloc(&mgc->rx[i].buf, cpu);
+		mgc->rxrings[i].cpuid = cpu;
+		rc = mgc_ring_malloc(&mgc->rxrings[i].buf, cpu);
 		if (rc < 0) {
 			pr_err("fail to kmalloc: *mgc_ring[%d], cpu=%d\n", i, cpu);
 			goto err;
 		}
-		mgc->rx[i].buf.next = &mgc->rx[(i + 1) % mgc->num_cpus].buf;
+		mgc->rxrings[i].next = &mgc->rxrings[(i + 1) % mgc->num_cpus];
 		pr_info("cpu=%d, rxbuf[%d], st: %p, wr: %p, rd: %p, end: %p\n",
 			cpu, i,
-			mgc->rx[i].buf.start, mgc->rx[i].buf.write,
-			mgc->rx[i].buf.read,  mgc->rx[i].buf.end);
+			mgc->rxrings[i].buf.start, mgc->rxrings[i].buf.write,
+			mgc->rxrings[i].buf.read,  mgc->rxrings[i].buf.end);
 
 		++i;
 	}
 
 	/* mgc_dev->cur_rxring */
-	mgc->cur_rxring = &mgc->rx[0];
+	mgc->cur_rxring = &mgc->rxrings[0];
 	pr_info("mgc->cur_ring: %p\n", mgc->cur_rxring);
 
 
@@ -222,16 +228,16 @@ mgcap_exit(void)
 
 	/* free rx ring buffer */
 	for (i = 0; i < mgc->num_cpus; i++) {
-		if (mgc->rx[i].buf.start) {
-			kfree(mgc->rx[i].buf.start);
-			mgc->rx[i].buf.start = NULL;
+		if (mgc->rxrings[i].buf.start) {
+			kfree(mgc->rxrings[i].buf.start);
+			mgc->rxrings[i].buf.start = NULL;
 		}
 	}
 
 	/* free rx ring buffers */
-	if (mgc->rx) {
-		kfree(mgc->rx);
-		mgc->rx = NULL;
+	if (mgc->rxrings) {
+		kfree(mgc->rxrings);
+		mgc->rxrings = NULL;
 	}
 
 	if (mgc) {

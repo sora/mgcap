@@ -24,6 +24,7 @@ printk("[%s]: start: %p, end: %p, rd: %p, wr: %p\n", \
 struct rxring {
 	struct mgc_ring buf;
 	uint8_t cpuid;
+	struct rxring *next;
 };
 
 struct mgc_dev {
@@ -31,10 +32,16 @@ struct mgc_dev {
 
 	uint8_t num_cpus;
 
-	struct rxring *rx;
+	struct rxring *rxrings;
 
 	struct rxring *cur_rxring;
 };
+
+static inline struct rxring *next_rxring(const struct rxring *rx)
+{
+	return rx->next;
+}
+
 
 #endif /* _MGCAP_H_ */
 
