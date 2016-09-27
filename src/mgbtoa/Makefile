@@ -1,8 +1,8 @@
-TARGET = mgdump
+TARGET = mgbtoa
 
 CFLAGS = -Wall -O
 
-SRCS := hwtstamp_config.c mgdump.c
+SRCS := hwtstamp_config.c mgbtoa.c
 OBJS = $(subst .c,.o,$(SRCS))
 
 ${TARGET}: ${OBJS}
