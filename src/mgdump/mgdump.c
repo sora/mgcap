@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <sys/socket.h>
 #include <linux/if.h>
@@ -12,6 +13,8 @@
 
 #define ETH_HDRLEN       (14)
 #define MGC_PKTLEN       (128)
+
+#define INTERVAL_100MSEC    100000
 
 static void usage(void)
 {
@@ -28,8 +31,7 @@ int main(int argc, char **argv)
 	unsigned long tstamp;
 	int olen;
 
-	FILE *fp;
-	int count;
+	int fd, count;
 	char *p;
 
 
@@ -55,23 +57,24 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	fp = fopen("/dev/mgcap/lo", "rb");
-	if (fp == NULL) {
+	fd = open("/dev/mgcap/lo", O_RDONLY);
+	if (fd < 0) {
 		fprintf(stderr, "cannot open mgcap device\n");
 		return 1;
 	}
 
 	while (1) {
-		p = &ibuf[0];
-
-		count = fread(p, sizeof(char), sizeof(ibuf), fp);
+		count = read(fd, &ibuf[0], sizeof(ibuf));
+		printf("count=%d\n", count);
 		if (count < 1) {
-			// sleep
+			usleep(INTERVAL_100MSEC);
 			continue;
 		} else if ((count & 127) != 0) {
 			printf("souteigai: count=%d\n", count);
 			exit(EXIT_FAILURE);
 		}
+
+		p = &ibuf[0];
 
 		for (i = 0; i < (count << 7); i++) {
 			printf("count=%d, i=%d\n", count, i);
@@ -112,7 +115,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	fclose(fp);
+	close(fd);
 
 	return 0;
 }
