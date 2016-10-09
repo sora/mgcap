@@ -71,7 +71,7 @@ mgcap_poll(struct file* filp, poll_table* wait)
 static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
-	int copy_len, available_read_len;
+	unsigned int copy_len, read_count;
 	struct rxring *rx = mgc->cur_rxring;
 
 	uint8_t ring_budget = mgc->num_cpus;
@@ -82,9 +82,9 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 			continue;
 		}
 
-		available_read_len = ring_free_count(&rx->buf);
-		if (count > available_read_len)
-			copy_len = available_read_len;
+		read_count = ring_count(&rx->buf);
+		if (count > read_count)
+			copy_len = read_count;
 		else
 			copy_len = count;
 
