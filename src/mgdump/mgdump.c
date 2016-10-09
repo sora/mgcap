@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -11,6 +13,7 @@
 
 #include "hwtstamp_config.h"
 
+#define MGC_HDRLEN       (10)
 #define ETH_HDRLEN       (14)
 #define MGC_PKTLEN       (128)
 
@@ -25,14 +28,14 @@ int main(int argc, char **argv)
 {
 	char ifname[IFNAMSIZ];
 	
-	char ibuf[128*32], obuf[128*32];
-	int ret, i, j;
+	char ibuf[128*1024];  // number of max input packets: 1024
+	char obuf[2*128*1024];  // max output size: 256 KB
+	int i;
 	unsigned short pktlen;
 	unsigned long tstamp;
-	int olen;
 
-	int fd, count;
-	char *p;
+	int fdi, fdo, count, numpkt;
+	char *pi, *po;
 
 
 	if (argc != 2 || (strlen(argv[1]) >= IFNAMSIZ)) {
@@ -57,52 +60,53 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	fd = open("/dev/mgcap/lo", O_RDONLY);
-	if (fd < 0) {
+	fdi = open("/dev/mgcap/lo", O_RDONLY);
+	if (fdi < 0) {
 		fprintf(stderr, "cannot open mgcap device\n");
 		return 1;
 	}
 
+	fdo = open("output.pkt", O_CREAT|O_WRONLY|O_TRUNC, 0755);
+	if (fdo < 0) {
+		fprintf(stderr, "cannot open output file\n");
+		return 1;
+	}
+
 	while (1) {
-		count = read(fd, &ibuf[0], sizeof(ibuf));
+		count = read(fdi, &ibuf[0], sizeof(ibuf));
 		printf("count=%d\n", count);
 		if (count < 1) {
 			usleep(INTERVAL_100MSEC);
 			continue;
-		} else if ((count & 127) != 0) {
+		}
+
+		numpkt = count >> 7;
+		if ((count & 127) != 0) {
 			printf("souteigai: count=%d\n", count);
 			exit(EXIT_FAILURE);
 		}
 
-		p = &ibuf[0];
-
-		for (i = 0; i < (count << 7); i++) {
+		pi = &ibuf[0];
+		po = &obuf[0];
+		for (i = 0; i < numpkt; i++) {
+			printf("numpkt: %d, i: %d\n", numpkt, i);
 			printf("count=%d, i=%d\n", count, i);
-			pktlen = *(unsigned short *)&p[0];
-			tstamp = *(unsigned long *)&p[2];
+			pktlen = *(unsigned short *)&pi[0];
+			tstamp = *(unsigned long *)&pi[2];
 			printf("pktlen=%u, tstamp=%lu\n", pktlen, tstamp);
 
+			// debug
 			if ((pktlen < 40) || (pktlen > 9014)) {
 				printf("format size: pktlen %X\n", pktlen);
 				exit(EXIT_FAILURE);
 			}
-
-			sprintf(obuf, "%02X%02X%02X%02X%02X%02X %02X%02X%02X%02X%02X%02X %02X%02X",
-					p[10], p[11], p[12], p[13], p[14], p[15],
-					p[16], p[17], p[18], p[19], p[20], p[21],
-					p[22], p[23]);
-			olen = strlen(obuf);
-			for (j = ETH_HDRLEN+10; j < pktlen; j++) {
-				sprintf(obuf + olen + ((j - (ETH_HDRLEN+10)) * 3), " %02X", p[j]);
-			}
-			strcat(obuf, "\n");
-			ret = write(1, obuf, strlen(obuf));
-			if (ret != strlen(obuf)) {
-				printf("ret isn't strlen(obuf)\n");
-				return 1;
-			}
-			p += 128;
+			memcpy(po, pi, (MGC_HDRLEN + pktlen));
+			pi += 128;
+			po += MGC_HDRLEN + pktlen;
 		}
+
+		// dump to file
+		count = write(fdo, obuf, count);
 	}
 		
 #if 0
@@ -115,7 +119,8 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	close(fd);
+	close(fdi);
+	close(fdo);
 
 	return 0;
 }
