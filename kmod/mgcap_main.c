@@ -50,21 +50,21 @@ static struct miscdevice mgcap_dev = {
 static int
 mgcap_open(struct inode *inode, struct file *filp)
 {
-	pr_info("entering %s\n", __func__);
+	func_enter();
 	return 0;
 }
 
 static int
 mgcap_release(struct inode *inode, struct file *filp)
 {
-	pr_info("entering %s\n", __func__);
+	func_enter();
 	return 0;
 }
 
 static unsigned int
 mgcap_poll(struct file* filp, poll_table* wait)
 {
-	pr_info("entering %s\n", __func__);
+	func_enter();
 	return 0;
 }
 
@@ -89,7 +89,7 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 			copy_len = count;
 
 		if (copy_to_user(buf, rx->buf.read, copy_len)) {
-			pr_info("copy_to_user failed\n");
+			pr_err("copy_to_user failed\n");
 			return -EFAULT;
 		}
 		ring_read_next(&rx->buf, copy_len);
@@ -131,6 +131,8 @@ mgcap_init_module(void)
 {
 	char pathdev[IFNAMSIZ];
 	int rc, cpu, i;
+
+	func_enter();
 
 	pr_info("mgcap (v%s) is loaded\n", MGCAP_VERSION);
 
