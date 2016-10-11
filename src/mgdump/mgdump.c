@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdint.h>
 
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <linux/if.h>
 
@@ -16,7 +17,7 @@
 
 #define MGC_HDRLEN       (10)
 #define ETH_HDRLEN       (14)
-#define MGC_PKTLEN       (128)
+#define MGC_SNAPLEN      (128)
 
 #define INTERVAL_100MSEC    100000
 
@@ -24,84 +25,122 @@
  * from https://github.com/the-tcpdump-group/libpcap */
 
 /* Section Header Block. */
-#define BT_SHB			0x0A0D0D0A
-#define BYTE_ORDER_MAGIC	0x1A2B3C4D
 struct section_header_block {
-	uint32_t	block_type;
-	uint32_t	total_length1;
-	uint32_t	byte_order_magic;
-	uint16_t	major_version;
-	uint16_t	minor_version;
-	uint64_t	section_length;
-	uint32_t	total_length2;
+	uint32_t block_type;
+	uint32_t total_length1;
+	uint32_t byte_order_magic;
+	uint16_t major_version;
+	uint16_t minor_version;
+	uint64_t section_length;
+	uint32_t total_length2;
 } __attribute__((packed));
 
 /* Interface Description Block. */
-#define BT_IDB			0x00000001
-
-#define IF_TSRESOL	9	/* interface's time stamp resolution */
-#define IF_FCSLEN	13	/* FCS length for this interface */
 struct interface_description_block {
-	uint32_t	block_type;
-	uint32_t	total_length1;
-	uint16_t	linktype;
-	uint16_t	reserved;
-	uint32_t	snaplen;
-	uint16_t	option_code_fcslen;
-	uint16_t	option_length_fcslen;
-	uint32_t	option_value_fcslen;
-	uint16_t	option_code_tsresol;
-	uint16_t	option_length_tsresol;
-	uint32_t	option_value_tsresol;
-	uint16_t	option_code_pad;
-	uint16_t	option_length_pad;
-	uint32_t	total_length2;
+	uint32_t block_type;
+	uint32_t total_length1;
+	uint16_t linktype;
+	uint16_t reserved;
+	uint32_t snaplen;
+	uint16_t option_code_fcslen;
+	uint16_t option_length_fcslen;
+	uint32_t option_value_fcslen;
+	uint16_t option_code_tsresol;
+	uint16_t option_length_tsresol;
+	uint32_t option_value_tsresol;
+	uint16_t option_code_pad;
+	uint16_t option_length_pad;
+	uint32_t total_length2;
 } __attribute__((packed));
 
 /* Enhanced Packet Block. */
 #define BT_EPB			0x00000006
-struct enhanced_packet_block {
-	uint32_t	block_type;
-	uint32_t	total_length;
-	uint32_t	interface_id;
-	uint32_t	timestamp_high;
-	uint32_t	timestamp_low;
-	uint32_t	caplen;
-	uint32_t	origlen;
+struct enhanced_packet_block_head {
+	uint32_t block_type;
+	uint32_t total_length;
+	uint32_t interface_id;
+	uint32_t timestamp_high;
+	uint32_t timestamp_low;
+	uint32_t caplen;
+	uint32_t origlen;
 	/* followed by packet data, options, and trailer */
 } __attribute__((packed));
 
 struct enhanced_packet_block_tail {
-	uint32_t	total_length;
+	uint32_t total_length;
 };
 
-
+#define BT_SHB                  0x0A0D0D0A
+#define BYTE_ORDER_MAGIC        0x1A2B3C4D
+#define PCAP_NG_VERSION_MAJOR	1
+#define PCAP_NG_VERSION_MINOR	0
 static struct section_header_block pcapng_shb_hdr = {
-	.block_type       = 0x0a0d0d0a,
-	.total_length1    = 0x1c000000,
-	.byte_order_magic = 0x4d3c2b1a,
-	.major_version    = 0x0100,
-	.minor_version    = 0x0100,
+	.block_type       = BT_SHB,
+	.total_length1    = sizeof(struct section_header_block),
+	.byte_order_magic = BYTE_ORDER_MAGIC,
+	.major_version    = PCAP_NG_VERSION_MAJOR,
+	.minor_version    = PCAP_NG_VERSION_MINOR,
 	.section_length   = 0xffffffffffffffff,
-	.total_length2    = 0x1c000000,
+	.total_length2    = sizeof(struct section_header_block),
 };
 
+#define BT_IDB            0x00000001
+#define IF_TSRESOL        9         /* interface's time stamp resolution */
+#define IF_FCSLEN         13        /* FCS length for this interface */
 static struct interface_description_block pcapng_idb_hdr = {
-	.block_type             = 0x01000000,
-	.total_length1          = 0x28000000,
-	.linktype               = 0x0100,
-	.reserved               = 0x0000,
-	.snaplen                = 0x60000000,
-	.option_code_fcslen     = 0x0d00,
-	.option_length_fcslen   = 0x0100,
-	.option_value_fcslen    = 0x04000000,
-	.option_code_tsresol    = 0x0900,
-	.option_length_tsresol  = 0x0100,
-	.option_value_tsresol   = 0x09000000,
-	.option_code_pad        = 0x0000,
-	.option_length_pad      = 0x0000,
-	.total_length2          = 0x28000000,
+	.block_type             = BT_IDB,
+	.total_length1          = sizeof(struct interface_description_block),
+	.linktype               = 0x01,
+	.reserved               = 0,
+	.snaplen                = 0xffff,
+	.option_code_fcslen     = IF_FCSLEN,
+	.option_length_fcslen   = 1,
+	.option_value_fcslen    = 4,
+	.option_code_tsresol    = IF_TSRESOL,
+	.option_length_tsresol  = 1,
+	.option_value_tsresol   = 9,
+	.option_code_pad        = 0,
+	.option_length_pad      = 0,
+	.total_length2          = sizeof(struct interface_description_block),
 };
+
+
+static inline void pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
+{
+	size_t epb_head_size = sizeof(struct enhanced_packet_block_head);
+	size_t epb_tail_size = sizeof(struct enhanced_packet_block_tail);
+	struct enhanced_packet_block_head epb_head;
+	struct enhanced_packet_block_tail epb_tail;
+	uint32_t epb_len, pad;
+	int copy_len;
+
+	copy_len = (pktlen > 96) ? 96 : pktlen;
+
+	pad = 4 - (copy_len % 4);
+	if (pad == 4)
+		pad = 0;
+
+	epb_len = epb_head_size + epb_tail_size + copy_len + pad;
+
+	printf("epb_len=%d, snaplen=%d, pktlen=%d, copy_len=%d\n", epb_len, MGC_SNAPLEN, pktlen, copy_len);
+	printf("pad=%d, epb_head_size=%d, epb_tail_size=%d\n", pad, (int)epb_head_size, (int)epb_tail_size);
+
+	// epb_head
+	epb_head.block_type      = BT_EPB;
+	epb_head.total_length    = epb_len;
+	epb_head.interface_id    = 0;
+	epb_head.timestamp_high  = (uint32_t)(ts >> 32);
+	epb_head.timestamp_low   = (uint32_t)(ts & 32);
+	epb_head.caplen          = copy_len;
+	epb_head.origlen         = pktlen;
+
+	// epb_tail
+	epb_tail.total_length = epb_len;
+
+	memcpy(po, &epb_head, epb_head_size);
+	memcpy((po + epb_head_size), pi, (size_t)pktlen);
+	memcpy((po + epb_head_size + (size_t)pktlen), &epb_tail, epb_tail_size);
+}
 
 
 static void usage(void)
@@ -113,14 +152,14 @@ int main(int argc, char **argv)
 {
 	char ifname[IFNAMSIZ];
 	
-	char ibuf[128*1024];  // number of max input packets: 1024
-	char obuf[2*128*1024];  // max output size: 256 KB
-	int i;
+	char ibuf[MGC_SNAPLEN*1024];  // number of max input packets: 1024
+	char obuf[2*MGC_SNAPLEN*1024];  // max output size: 256 KB
 	unsigned short pktlen;
 	unsigned long tstamp;
 
 	int fdi, fdo, count, numpkt;
 	char *pi, *po;
+	int i;
 
 
 	if (argc != 2 || (strlen(argv[1]) >= IFNAMSIZ)) {
@@ -151,9 +190,23 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	fdo = open("output.pkt", O_CREAT|O_WRONLY|O_TRUNC, 0755);
+	fdo = open("output.pcap", O_CREAT|O_WRONLY|O_TRUNC, 0755);
 	if (fdo < 0) {
 		fprintf(stderr, "cannot open output file\n");
+		return 1;
+	}
+
+	// BT_SHB
+	count = write(fdo, &pcapng_shb_hdr, sizeof(struct section_header_block));
+	if (count != sizeof(struct section_header_block)) {
+		fprintf(stderr, "cannot write output file: BT_SHB\n");
+		return 1;
+	}
+
+	// BT_IDB
+	count = write(fdo, &pcapng_idb_hdr, sizeof(struct interface_description_block));
+	if (count != sizeof(struct interface_description_block)) {
+		fprintf(stderr, "cannot write output file: BT_IDB\n");
 		return 1;
 	}
 
@@ -165,8 +218,8 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		numpkt = count >> 7;
-		if ((count & 127) != 0) {
+		numpkt = count >> 7;    // count / MGC_SNAPLEN
+		if ((count & 127) != 0) {    // count % MGC_SNAPLEN
 			printf("souteigai: count=%d\n", count);
 			exit(EXIT_FAILURE);
 		}
@@ -183,8 +236,8 @@ int main(int argc, char **argv)
 				printf("format size: pktlen %X\n", pktlen);
 				exit(EXIT_FAILURE);
 			}
-			memcpy(po, pi, (MGC_HDRLEN + pktlen));
-			pi += 128;
+			pcapng_epb_memcpy(po, pi, pktlen, tstamp);
+			pi += MGC_SNAPLEN;
 			po += MGC_HDRLEN + pktlen;
 		}
 
