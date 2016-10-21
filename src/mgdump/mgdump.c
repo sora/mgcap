@@ -122,8 +122,8 @@ static inline int pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
 
 	epb_len = epb_head_size + epb_tail_size + copy_len + pad;
 
-	printf("epb_len=%d, snaplen=%d, pktlen=%d, copy_len=%d\n", epb_len, MGC_SNAPLEN, pktlen, copy_len);
-	printf("pad=%d, epb_head_size=%d, epb_tail_size=%d\n", pad, (int)epb_head_size, (int)epb_tail_size);
+	//printf("epb_len=%d, snaplen=%d, pktlen=%d, copy_len=%d\n", epb_len, MGC_SNAPLEN, pktlen, copy_len);
+	//printf("pad=%d, epb_head_size=%d, epb_tail_size=%d\n", pad, (int)epb_head_size, (int)epb_tail_size);
 
 	// epb_head
 	epb_head.block_type      = BT_EPB;
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 		count = read(fdi, &ibuf[0], sizeof(ibuf));
-		printf("count=%d\n", count);
+		//printf("count=%d\n", count);
 		if (count < 1) {
 			usleep(INTERVAL_100MSEC);
 			continue;
@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 		for (i = 0; i < numpkt; i++) {
 			pktlen = *(unsigned short *)&pi[0];
 			tstamp = *(unsigned long *)&pi[2];
-			printf("pktlen=%u, tstamp=%lu\n", pktlen, tstamp);
+			//printf("pktlen=%u, tstamp=%lu\n", pktlen, tstamp);
 
 			// debug
 			if ((pktlen < 40) || (pktlen > 9014)) {
