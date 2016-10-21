@@ -105,7 +105,7 @@ static struct interface_description_block pcapng_idb_hdr = {
 };
 
 
-static inline void pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
+static inline int pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
 {
 	size_t epb_head_size = sizeof(struct enhanced_packet_block_head);
 	size_t epb_tail_size = sizeof(struct enhanced_packet_block_tail);
@@ -138,8 +138,10 @@ static inline void pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts
 	epb_tail.total_length = epb_len;
 
 	memcpy(po, &epb_head, epb_head_size);
-	memcpy((po + epb_head_size), pi, (size_t)pktlen);
-	memcpy((po + epb_head_size + (size_t)pktlen), &epb_tail, epb_tail_size);
+	memcpy((po + epb_head_size), pi, (size_t)copy_len);
+	memcpy((po + epb_head_size + (size_t)copy_len), &epb_tail, epb_tail_size);
+
+	return copy_len;
 }
 
 
@@ -160,6 +162,7 @@ int main(int argc, char **argv)
 	int fdi, fdo, count, numpkt;
 	char *pi, *po;
 	int i;
+	int copy_len;
 
 
 	if (argc != 2 || (strlen(argv[1]) >= IFNAMSIZ)) {
@@ -236,9 +239,9 @@ int main(int argc, char **argv)
 				printf("format size: pktlen %X\n", pktlen);
 				exit(EXIT_FAILURE);
 			}
-			pcapng_epb_memcpy(po, pi, pktlen, tstamp);
+			copy_len = pcapng_epb_memcpy(po, pi, pktlen, tstamp);
 			pi += MGC_SNAPLEN;
-			po += MGC_HDRLEN + pktlen;
+			po += MGC_HDRLEN + copy_len;
 		}
 
 		// dump to file
