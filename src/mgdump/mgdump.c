@@ -138,10 +138,10 @@ static inline int pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
 	epb_tail.total_length = epb_len;
 
 	memcpy(po, &epb_head, epb_head_size);
-	memcpy((po + epb_head_size), pi, (size_t)copy_len);
+	memcpy((po + epb_head_size), (pi + MGC_HDRLEN), (size_t)copy_len);
 	memcpy((po + epb_head_size + (size_t)copy_len), &epb_tail, epb_tail_size);
 
-	return copy_len;
+	return epb_len;
 }
 
 
@@ -241,7 +241,7 @@ int main(int argc, char **argv)
 			}
 			copy_len = pcapng_epb_memcpy(po, pi, pktlen, tstamp);
 			pi += MGC_SNAPLEN;
-			po += MGC_HDRLEN + copy_len;
+			po += copy_len;
 		}
 
 		// dump to file
