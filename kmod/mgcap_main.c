@@ -12,6 +12,9 @@
 
 #define MGCAP_VERSION  "0.0.0"
 
+#define IOCTL_DEBUG_ENABLE    10
+#define IOCTL_DEBUG_DISABLE   11
+
 /* Module parameters, defaults. */
 static int debug = 0;
 static char *ifname = "eth0";
@@ -79,6 +82,8 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 	while(ring_budget--) {
 		if (ring_empty(&rx->buf)) {
 			rx = next_rxring(rx);
+			if (debug)
+				pr_info("ring_empty\n");
 			continue;
 		}
 
@@ -93,11 +98,17 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 			return -EFAULT;
 		}
 		ring_read_next(&rx->buf, copy_len);
+//		if (debug) {
+//			pr_info("2 read_end: copy_len=%u, read_count=%u, count=%u\n",
+//				copy_len, read_count, (unsigned int)count);
+//			pr_info("2 read_end: start=%p, read=%p, write=%p, end=%p\n",
+//				rx->buf.start, rx->buf.read, rx->buf.write, rx->buf.end);
+//		}
 
 		return copy_len;
 	}
-
 	mgc->cur_rxring = rx;
+
 	return 0;
 }
 
@@ -105,12 +116,20 @@ static long
 mgcap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
-#if 0
-	struct mgc_ring txbuf, rxbuf;
+	//struct mgc_ring txbuf, rxbuf;
 
 	pr_info("entering %s\n", __func__);
 
 	switch(cmd) {
+		case IOCTL_DEBUG_ENABLE:
+			pr_info("IOCTL_DEBUG_ENABLE\n");
+			debug = 1;
+			break;
+		case IOCTL_DEBUG_DISABLE:
+			pr_info("IOCTL_DEBUG_DISABLE\n");
+			debug = 0;
+			break;
+#if 0
 		case MGCTXSYNC:
 			copy_from_user(&txbuf, (void *)arg, sizeof(struct mgc_ring));
 			pr_info("MGCTXSYNC: txbuf->head: %p", txbuf.head);
@@ -119,10 +138,11 @@ mgcap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			copy_from_user(&rxbuf, (void *)arg, sizeof(struct mgc_ring));
 			pr_info("MGCRXSYNC: rxbuf->head: %p", rxbuf.head);
 			break;
+#endif
 		default:
 			break;
 	}
-#endif
+
 	return  ret;
 }
 
