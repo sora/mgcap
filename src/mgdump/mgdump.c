@@ -156,6 +156,7 @@ int main(int argc, char **argv)
 	
 	char ibuf[MGC_SNAPLEN*1024];  // number of max input packets: 1024
 	char obuf[2*MGC_SNAPLEN*1024];  // max output size: 256 KB
+	unsigned int pkt_count = 0;
 	unsigned short pktlen;
 	unsigned long tstamp;
 
@@ -246,6 +247,8 @@ int main(int argc, char **argv)
 
 		// dump to file
 		count = write(fdo, obuf, count);
+		pkt_count += numpkt;
+		printf("pkt_count: %u\n", pkt_count);
 	}
 		
 #if 0
