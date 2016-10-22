@@ -91,7 +91,7 @@ static inline void ring_write_next(struct mgc_ring *r, size_t size)
 {
 //	r->write += ALIGN(size, 4);
 	r->write += size;
-	if (r->write > r->end) {
+	if (r->write >= r->end) {
 		r->write = r->start;
 	}
 }
@@ -100,7 +100,7 @@ static inline void ring_read_next(struct mgc_ring *r, size_t size)
 {
 //	r->read += ALIGN(size, 4);
 	r->read += size;
-	if (r->read > r->end) {
+	if (r->read >= r->end) {
 		r->read = r->start;
 	}
 }
