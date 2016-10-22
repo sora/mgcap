@@ -82,7 +82,7 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 			continue;
 		}
 
-		read_count = ring_count(&rx->buf);
+		read_count = ring_count_end(&rx->buf);
 		if (count > read_count)
 			copy_len = read_count;
 		else
