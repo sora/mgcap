@@ -10,7 +10,7 @@
 #include "mgcap.h"
 #include "mgcap_rx.h"
 
-#define MGCAP_VERSION  "0.0.0"
+#define MGCAP_VERSION  "0.0.1"
 
 #define IOCTL_DEBUG_ENABLE    10
 #define IOCTL_DEBUG_DISABLE   11
