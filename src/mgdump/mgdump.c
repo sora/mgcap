@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <signal.h>
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -20,6 +21,9 @@
 #define MGC_SNAPLEN      (128)
 
 #define INTERVAL_100MSEC    100000
+
+/* Global variables */
+static int caught_signal;
 
 /* PCAP-NG header
  * from https://github.com/the-tcpdump-group/libpcap */
@@ -144,7 +148,30 @@ static inline int pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
 	return epb_len;
 }
 
+/*
+ * sig_handler
+ * @sig:
+ */
+void sig_handler(int sig) {
+	if (sig == SIGINT)
+		caught_signal = 1;
+}
 
+/*
+ *  set_signal
+ *  @sig:
+ */
+void set_signal(int sig) {
+	if (signal(sig, sig_handler) == SIG_ERR) {
+		fprintf(stderr, "Cannot set signal\n");
+		exit(1);
+	}
+}
+
+/*
+ * usage
+ * 
+ */
 static void usage(void)
 {
 	fputs("Usage: COMMAND <if_name> <out_file>\n", stderr);
@@ -214,6 +241,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// signal handler
+	set_signal(SIGINT);
+
 	while (1) {
 		count = read(fdi, &ibuf[0], sizeof(ibuf));
 		//printf("count=%d\n", count);
@@ -248,7 +278,10 @@ int main(int argc, char **argv)
 		// dump to file
 		count = write(fdo, obuf, count);
 		pkt_count += numpkt;
-		printf("pkt_count: %u\n", pkt_count);
+		//printf("pkt_count: %u\n", pkt_count);
+
+		if (caught_signal)
+			break;
 	}
 		
 #if 0
