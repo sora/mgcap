@@ -38,9 +38,9 @@ $ # pkt-gen from the Sender
 $ sudo rmmod mgcap
 ```
 
-**Result (256B)**
-* Multiple-queue traffic with no-hwtstamp: 135645600 pps
-* Single-queue traffic with no-hwtstamp: 131505904 pps
-* Multiple-queue traffic with hwtstamp: 135796366 pps
-* Single-queue traffic with hwtstamp: 87605275 pps
+**Result (256B, MAX=4,528,985 pps)**
+* Multiple-queue traffic with no-hwtstamp: 4,521,520 pps
+* Single-queue traffic with no-hwtstamp: 4,383,530 pps
+* Multiple-queue traffic with hwtstamp: 4,526,545 pps
+* Single-queue traffic with hwtstamp: 2,920,175 pps
 
