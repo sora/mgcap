@@ -135,8 +135,7 @@ int main(int argc, char **argv)
 
 	int fdi, fdo, count, numpkt;
 	char *pi, *po;
-	int i;
-	int copy_len;
+	int i, copy_len;
 
 
 	if (argc != 2 || (strlen(argv[1]) >= IFNAMSIZ)) {
@@ -144,22 +143,6 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	strcpy(ifname, argv[1]);
-
-#if 0
-	// config get
-	ret = hwtstamp_config_save(ifname);
-	if (ret < 0) {
-		fprintf(stderr, "hwtstamp_config_save() error\n");
-		return 1;
-	}
-
-	// config set
-	ret = hwtstamp_config_set_hwtstamp(ifname);
-	if (ret < 0) {
-		fprintf(stderr, "hwtstamp_config_set_hwtstamp() error\n");
-		return 1;
-	}
-#endif
 
 	fdi = open("/dev/mgcap/enp1s0f1", O_RDONLY);
 	if (fdi < 0) {
@@ -231,16 +214,6 @@ int main(int argc, char **argv)
 
 		mgdump_stat.packet_count += numpkt;
 	}
-		
-#if 0
-//err:
-	// config restore
-	ret = hwtstamp_config_restore(ifname);
-	if (ret < 0) {
-		fprintf(stderr, "hwtstamp_config_restore() error\n");
-		return 1;
-	}
-#endif
 
 	close(fdi);
 	close(fdo);

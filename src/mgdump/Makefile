@@ -2,7 +2,7 @@ TARGET = mgdump
 
 CFLAGS = -Wall -O2
 
-SRCS := hwtstamp_config.c mgdump.c
+SRCS := mgdump.c
 OBJS = $(subst .c,.o,$(SRCS))
 
 ${TARGET}: ${OBJS}

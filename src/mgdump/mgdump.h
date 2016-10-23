@@ -14,8 +14,6 @@
 #include <sys/socket.h>
 #include <linux/if.h>
 
-#include "hwtstamp_config.h"
-
 #define MGC_HDRLEN       (10)
 #define ETH_HDRLEN       (14)
 #define MGC_SNAPLEN      (128)
