@@ -1,6 +1,6 @@
 TARGET = mgdump
 
-CFLAGS = -Wall -O
+CFLAGS = -Wall -O2
 
 SRCS := hwtstamp_config.c mgdump.c
 OBJS = $(subst .c,.o,$(SRCS))
