@@ -11,6 +11,7 @@ A high-performance capturing device for traffic monitoring
 
 ## How to use
 
+**Traffic capture**
 ```bash
 $ cd kmod; make
 $ sudo insmod kmod/mgcap.ko ifname="lo"
@@ -20,6 +21,14 @@ $ cd src/mgdump; make
 $ sudo ./mgdump /dev/mgcap/lo 
 $ tshark -r ./output.pcap
 $ sudo rmmod mgcap
+```
+**Enable/Disable hardware timestamp**
+```bash
+$ cd src/tools; make
+$ # enable HWTstamp
+$ sudo ./mgcap_hwtstamp_config enp1s0f1 1
+$ # disable HWTstamp
+$ sudo ./mgcap_hwtstamp_config enp1s0f1 0
 ```
 
 ## Performance experience
