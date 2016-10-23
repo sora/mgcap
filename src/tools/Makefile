@@ -1,17 +1,8 @@
-TARGET = mgcap_ioctl
-
-CFLAGS = -Wall -O
-
-SRCS := mgcap_ioctl.c
-OBJS = $(subst .c,.o,$(SRCS))
-
-${TARGET}: ${OBJS}
-	$(CC) ${LDFLAGS} -o $@ $^
-
-.c.o:
-	$(CC) ${CFLAGS} -o $@ -c $<
+all:
+	gcc -Wall -O -o mgcap_ioctl mgcap_ioctl.c
+	gcc -Wall -O -o mgcap_hwtstamp_config mgcap_hwtstamp_config.c
 
 .PHONY: clean
 clean:
-	rm -f ${TARGET} ${OBJS}
+	rm -f mgcap_ioctl mgcap_hwtstamp_config
 
