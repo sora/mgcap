@@ -20,7 +20,8 @@
 #define ETH_HDRLEN       (14)
 #define MGC_SNAPLEN      (128)
 
-#define INTERVAL_100MSEC    100000
+//#define INTERVAL_100MSEC    100000
+#define INTERVAL_100USEC    100
 
 
 /* PCAP-NG header
@@ -146,7 +147,7 @@ static inline int pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
 	epb_head.total_length    = epb_len;
 	epb_head.interface_id    = 0;
 	epb_head.timestamp_high  = (uint32_t)(ts >> 32);
-	epb_head.timestamp_low   = (uint32_t)(ts & 32);
+	epb_head.timestamp_low   = (uint32_t)(ts & 0xFFFFFFFF);
 	epb_head.caplen          = copy_len;
 	epb_head.origlen         = pktlen;
 
@@ -238,12 +239,13 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	fdi = open("/dev/mgcap/lo", O_RDONLY);
+	fdi = open("/dev/mgcap/enp1s0f1", O_RDONLY);
 	if (fdi < 0) {
 		fprintf(stderr, "cannot open mgcap device\n");
 		return 1;
 	}
 
+//	fdo = open("/dev/null", O_CREAT|O_WRONLY|O_TRUNC, 0755);
 	fdo = open("output.pcap", O_CREAT|O_WRONLY|O_TRUNC, 0755);
 	if (fdo < 0) {
 		fprintf(stderr, "cannot open output file\n");
@@ -276,7 +278,7 @@ int main(int argc, char **argv)
 		count = read(fdi, &ibuf[0], sizeof(ibuf));
 		//printf("count=%d\n", count);
 		if (count < 1) {
-			usleep(INTERVAL_100MSEC);
+			usleep(INTERVAL_100USEC);
 			continue;
 		}
 
@@ -291,7 +293,6 @@ int main(int argc, char **argv)
 		for (i = 0; i < numpkt; i++) {
 			pktlen = *(unsigned short *)&pi[0];
 			tstamp = *(unsigned long *)&pi[2];
-			//printf("pktlen=%u, tstamp=%lu\n", pktlen, tstamp);
 
 			// debug
 			if ((pktlen < 40) || (pktlen > 9014)) {
