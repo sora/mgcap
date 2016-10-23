@@ -117,7 +117,8 @@ void dump_stat(void) {
  */
 static void usage(void)
 {
-	fputs("Usage: COMMAND <if_name> <out_file>\n", stderr);
+	//fputs("Usage: COMMAND <if_name> <out_file>\n", stderr);
+	fputs("Usage: COMMAND <if_name>\n", stderr);
 }
 
 /*
@@ -126,25 +127,23 @@ static void usage(void)
  */
 int main(int argc, char **argv)
 {
-	char ifname[IFNAMSIZ];
+	char ifname[11 + IFNAMSIZ];
 	
 	char ibuf[MGC_SNAPLEN*1024];  // number of max input packets: 1024
 	char obuf[2*MGC_SNAPLEN*1024];  // max output size: 256 KB
 	unsigned short pktlen;
 	unsigned long tstamp;
 
-	int fdi, fdo, count, numpkt;
+	int i, copy_len, fdi, fdo, count, numpkt;
 	char *pi, *po;
-	int i, copy_len;
 
-
-	if (argc != 2 || (strlen(argv[1]) >= IFNAMSIZ)) {
+	if (argc != 2 || (strlen(argv[1]) >= (11 + IFNAMSIZ))) {
 		usage();
 		return 2;
 	}
 	strcpy(ifname, argv[1]);
 
-	fdi = open("/dev/mgcap/enp1s0f1", O_RDONLY);
+	fdi = open(ifname, O_RDONLY);
 	if (fdi < 0) {
 		fprintf(stderr, "cannot open mgcap device\n");
 		return 1;
@@ -157,7 +156,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	printf("mgdump: listening on lo\n");
+	printf("mgdump: listening on %s\n", ifname);
 
 	// BT_SHB
 	count = write(fdo, &pcapng_shb_hdr, sizeof(struct section_header_block));
