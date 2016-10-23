@@ -44,7 +44,7 @@
 #define MGC_HDR_SIZE              MGC_HDR_PKTLEN_SIZE + MGC_HDR_TSTAMP_SIZE
 #define MGC_PKT_SNAPLEN           96
 #define MGC_DATASLOT_SIZE         128
-#define RING_SIZE                 (MGC_DATASLOT_SIZE * 4096)       // 2^n
+#define RING_SIZE                 (MGC_DATASLOT_SIZE * 4096 * 8)       // 2^n
 #define NBULK_PKT                 1
 #define RING_ALMOST_FULL          (MGC_DATASLOT_SIZE * 2)
 #define RING_MALLOC_SIZE          (RING_SIZE + (MGC_DATASLOT_SIZE * NBULK_PKT))

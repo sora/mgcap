@@ -82,8 +82,6 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 	while(ring_budget--) {
 		if (ring_empty(&rx->buf)) {
 			rx = next_rxring(rx);
-			if (debug)
-				pr_info("ring_empty\n");
 			continue;
 		}
 
@@ -98,12 +96,8 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 			return -EFAULT;
 		}
 		ring_read_next(&rx->buf, copy_len);
-//		if (debug) {
-//			pr_info("2 read_end: copy_len=%u, read_count=%u, count=%u\n",
-//				copy_len, read_count, (unsigned int)count);
-//			pr_info("2 read_end: start=%p, read=%p, write=%p, end=%p\n",
-//				rx->buf.start, rx->buf.read, rx->buf.write, rx->buf.end);
-//		}
+
+		//mgc->cur_rxring = next_rxring(rx);
 
 		return copy_len;
 	}
