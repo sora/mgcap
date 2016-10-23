@@ -22,8 +22,6 @@
 
 #define INTERVAL_100MSEC    100000
 
-/* Global variables */
-static int caught_signal;
 
 /* PCAP-NG header
  * from https://github.com/the-tcpdump-group/libpcap */
@@ -74,6 +72,19 @@ struct enhanced_packet_block_tail {
 	uint32_t total_length;
 };
 
+struct mgdump_statistics {
+	uint32_t packet_count;
+};
+
+
+/* Global variables */
+static int caught_signal = 0;
+
+static struct mgdump_statistics mgdump_stat = {
+	.packet_count = 0,
+};
+
+// SHB
 #define BT_SHB                  0x0A0D0D0A
 #define BYTE_ORDER_MAGIC        0x1A2B3C4D
 #define PCAP_NG_VERSION_MAJOR	1
@@ -88,6 +99,7 @@ static struct section_header_block pcapng_shb_hdr = {
 	.total_length2    = sizeof(struct section_header_block),
 };
 
+// IDB
 #define BT_IDB            0x00000001
 #define IF_TSRESOL        9         /* interface's time stamp resolution */
 #define IF_FCSLEN         13        /* FCS length for this interface */
@@ -169,6 +181,14 @@ void set_signal(int sig) {
 }
 
 /*
+ *  dump_stat
+ *  
+ */
+void dump_stat(void) {
+	printf("\n%u packets captured\n", mgdump_stat.packet_count);
+}
+
+/*
  * usage
  * 
  */
@@ -177,13 +197,16 @@ static void usage(void)
 	fputs("Usage: COMMAND <if_name> <out_file>\n", stderr);
 }
 
+/*
+ * main
+ * 
+ */
 int main(int argc, char **argv)
 {
 	char ifname[IFNAMSIZ];
 	
 	char ibuf[MGC_SNAPLEN*1024];  // number of max input packets: 1024
 	char obuf[2*MGC_SNAPLEN*1024];  // max output size: 256 KB
-	unsigned int pkt_count = 0;
 	unsigned short pktlen;
 	unsigned long tstamp;
 
@@ -227,6 +250,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	printf("mgdump: listening on lo\n");
+
 	// BT_SHB
 	count = write(fdo, &pcapng_shb_hdr, sizeof(struct section_header_block));
 	if (count != sizeof(struct section_header_block)) {
@@ -245,6 +270,9 @@ int main(int argc, char **argv)
 	set_signal(SIGINT);
 
 	while (1) {
+		if (caught_signal)
+			break;
+
 		count = read(fdi, &ibuf[0], sizeof(ibuf));
 		//printf("count=%d\n", count);
 		if (count < 1) {
@@ -277,11 +305,8 @@ int main(int argc, char **argv)
 
 		// dump to file
 		count = write(fdo, obuf, count);
-		pkt_count += numpkt;
-		//printf("pkt_count: %u\n", pkt_count);
 
-		if (caught_signal)
-			break;
+		mgdump_stat.packet_count += numpkt;
 	}
 		
 #if 0
@@ -296,6 +321,8 @@ int main(int argc, char **argv)
 
 	close(fdi);
 	close(fdo);
+
+	dump_stat();
 
 	return 0;
 }
