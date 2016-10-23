@@ -6,6 +6,7 @@ A high-performance capturing device for traffic monitoring
 * Qdisc bypass
 * Multiple queue NIC
 * PCAP-NG format
+* 96 Byte snaplen
 * High-resolution timestamp (e.g., Intel X550, etc)
 
 ## How to use
@@ -44,3 +45,23 @@ $ sudo rmmod mgcap
 * Multiple-queue traffic with hwtstamp: 4,526,545 pps
 * Single-queue traffic with hwtstamp: 2,920,175 pps
 
+## Spec
+
+**Packet format from mgcap kernel module**
+
+```
+ * 0                      15 (bit)
+ * +-----------------------+
+ * |    SKB_LEN(16 bit)    |
+ * +-----------------------+
+ * |                       |
+ * |      Hardware         |
+ * |      Timestamp        |
+ * |       (64 bit)        |
+ * +-----------------------+
+ * |                       |
+ * |    Ethernet frame     |
+ * |                       |
+ * |~~~~~~~~~~~~~~~~~~~~~~~|
+ * +-----------------------+
+```
