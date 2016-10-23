@@ -22,14 +22,13 @@ $ sudo rmmod mgcap
 ```
 
 ## Performance experience
-## Intel X550
-** Machines **
 
+### Intel X550
+**Machines**
 * Sender: FreeBSD 11 +x550 +netmap +pkt-gen
 * Receiver: Linux 4.4 +x550 +mgcap +mgdump
 
-** Setup **
-
+**Setup**
 ```bash
 $ cd kmod; make
 $ sudo insmod kmod/mgcap.ko ifname="enp1s0f1"
@@ -37,9 +36,9 @@ $ cd src/mgdump; make
 $ sudo ./mgdump /dev/mgcap/enp1s0f1 
 $ # pkt-gen from the Sender
 $ sudo rmmod mgcap
+```
 
-** Result (256B) **
-
+**Result (256B)**
 * Multiple-queue traffic with no-hwtstamp: 135645600 pps
 * Single-queue traffic with no-hwtstamp: 131505904 pps
 * Multiple-queue traffic with hwtstamp: 135796366 pps
