@@ -21,7 +21,7 @@ static char *ifname = "eth0";
 static int rxbuf_size = 19;
 
 /* Global variables */
-struct mgc_dev *mgc;
+struct mgcap mgcap;
 
 
 static int mgcap_open(struct inode *, struct file *);
@@ -45,7 +45,6 @@ static struct file_operations mgcap_fops = {
 
 static struct miscdevice mgcap_dev = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = DRV_NAME,
 	.fops = &mgcap_fops,
 };
 
@@ -53,6 +52,19 @@ static struct miscdevice mgcap_dev = {
 static int
 mgcap_open(struct inode *inode, struct file *filp)
 {
+	struct mgc_dev *mgc;
+	char devname[IFNAMSIZ];
+	strncpy (devname, filp->f_path.dentry->d_name.name, IFNAMSIZ);
+
+	mgc = mgcap_find_dev(&mgcap, devname);
+	if (!mgc) {
+		pr_err("%s: no device found \"%s\"\n",
+		       __func__, filp->f_path.dentry->d_name.name);
+		return -ENOENT;
+	}
+
+	filp->private_data = mgc;
+
 	func_enter();
 	return 0;
 }
@@ -61,6 +73,9 @@ static int
 mgcap_release(struct inode *inode, struct file *filp)
 {
 	func_enter();
+
+	filp->private_data = NULL;
+
 	return 0;
 }
 
@@ -75,6 +90,7 @@ static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned int copy_len, read_count;
+	struct mgc_dev *mgc = (struct mgc_dev *)filp->private_data;
 	struct rxring *rx = mgc->cur_rxring;
 
 	uint8_t ring_budget = mgc->num_cpus;
@@ -140,15 +156,25 @@ mgcap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return  ret;
 }
 
-static int __init
-mgcap_init_module(void)
+int register_mgc_dev(char *ifname)
 {
 	char pathdev[IFNAMSIZ];
 	int rc, cpu, i;
+	struct net_device *dev;
+	struct mgc_dev *mgc;
 
-	func_enter();
+	pr_info("register device \"%s\" for mgcap\n", ifname);
 
-	pr_info("mgcap (v%s) is loaded\n", MGCAP_VERSION);
+	dev = dev_get_by_name(&init_net, ifname);
+	if (!dev) {
+		pr_err("Could not find %s\n", ifname);
+		goto err;
+	}
+
+	if (mgcap_find_dev(&mgcap, ifname)) {
+		pr_err("dev \"%s\" is already registered for mgcap\n", ifname);
+		goto err;
+	}
 
 	/* malloc mgc_dev */
 	mgc = kmalloc(sizeof(struct mgc_dev), GFP_KERNEL);
@@ -161,7 +187,8 @@ mgcap_init_module(void)
 	pr_info("mgc->num_cpus: %d\n", mgc->num_cpus);
 
 	/* malloc mgc_dev->rx */
-	mgc->rxrings = kmalloc(sizeof(struct rxring) * mgc->num_cpus, GFP_KERNEL);
+	mgc->rxrings = kmalloc(sizeof(struct rxring) * mgc->num_cpus,
+			       GFP_KERNEL);
 	if (mgc->rxrings == 0) {
 		pr_err("fail to kmalloc: *mgc_dev->rx\n");
 		goto err;
@@ -189,13 +216,8 @@ mgcap_init_module(void)
 	mgc->cur_rxring = &mgc->rxrings[0];
 	pr_info("mgc->cur_ring: %p\n", mgc->cur_rxring);
 
-
 	/* mgc->dev */
-	mgc->dev = dev_get_by_name(&init_net, ifname);
-	if (!mgc->dev) {
-		pr_err("Could not find %s\n", ifname);
-		goto err;
-	}
+	mgc->dev = dev;
 
 	/* register character device */
 	sprintf(pathdev, "%s/%s", DRV_NAME, ifname);
@@ -215,19 +237,23 @@ mgcap_init_module(void)
 		goto err;
 	}
 
-	return rc;
+	// save mgcap_dev to mgcap->dev_list
+	mgcap_add_dev(&mgcap, mgc);
+
+	return 0;
 
 err:
-	mgcap_exit();
 	return -1;
+
 }
-module_init(mgcap_init_module);
 
-
-void
-mgcap_exit(void)
+int unregister_mgc_dev(struct mgc_dev *mgc)
 {
 	int i;
+
+	pr_info("unregister device \"%s\" from mgcap\n", mgc->dev->name);
+
+	mgcap_del_dev(mgc);
 
 	if (mgc->dev) {
 		rtnl_lock();
@@ -252,17 +278,54 @@ mgcap_exit(void)
 	}
 
 	if (mgc) {
-		kfree(mgc);
+		kfree_rcu(mgc, rcu);
 		mgc = NULL;
+	}
+
+	return 0;
+}
+
+static void mgcap_init(struct mgcap *mgcap)
+{
+	INIT_LIST_HEAD(&mgcap->dev_list);
+}
+
+static int __init
+mgcap_init_module(void)
+{
+	int rc;
+
+	func_enter();
+
+	pr_info("mgcap (v%s) is loaded\n", MGCAP_VERSION);
+	mgcap_init(&mgcap);
+
+	rc = register_mgc_dev(ifname);
+	if (rc < 0)
+		mgcap_exit();
+
+	return rc;
+}
+module_init(mgcap_init_module);
+
+
+void
+mgcap_exit(void)
+{
+	struct list_head *p, *tmp;
+	struct mgc_dev *mgc;
+
+	list_for_each_safe(p, tmp, &mgcap.dev_list) {
+		mgc = list_entry(p, struct mgc_dev, list);
+		unregister_mgc_dev(mgc);
 	}
 }
 
 static void __exit
 mgcap_exit_module(void)
 {
-	pr_info("mgcap (v%s) is unloaded\n", MGCAP_VERSION);
-
 	mgcap_exit();
+	pr_info("mgcap (v%s) is unloaded\n", MGCAP_VERSION);
 
 	return;
 }

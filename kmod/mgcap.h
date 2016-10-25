@@ -28,6 +28,9 @@ struct rxring {
 };
 
 struct mgc_dev {
+	struct list_head list;	/* mgcap->dev_list */
+	struct rcu_head	rcu;
+
 	struct net_device *dev;
 
 	uint8_t num_cpus;
@@ -37,8 +40,36 @@ struct mgc_dev {
 	struct rxring *cur_rxring;
 };
 
+struct mgcap {
+	struct list_head dev_list;	/* mgc_dev */
+};
+
+static inline struct mgc_dev *mgcap_find_dev(struct mgcap *mgcap,
+					     char *devname)
+{
+	struct mgc_dev *mgc;
+
+	list_for_each_entry_rcu(mgc, &mgcap->dev_list, list) {
+		if (strncmp(mgc->dev->name, devname, IFNAMSIZ) == 0)
+			return mgc;
+	}
+	return NULL;
+}
+
+static inline void mgcap_add_dev(struct mgcap *mgcap, struct mgc_dev *mgc)
+{
+	list_add_rcu(&mgc->list, &mgcap->dev_list);
+}
+
+static inline void mgcap_del_dev(struct mgc_dev *mgc)
+{
+	list_del_rcu(&mgc->list);
+}
+
+
+
 /* Global variables */
-extern struct mgc_dev *mgc;
+extern struct mgcap mgcap;
 
 
 static inline struct rxring *next_rxring(const struct rxring *rx)

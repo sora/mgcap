@@ -31,3 +31,12 @@
 # Debug files
 *.dSYM/
 *.su
+
+
+# Kmod compile output files
+*.mod.c
+.*.cmd
+.tmp_versions*
+modules.order
+Module.symvers
+*.out

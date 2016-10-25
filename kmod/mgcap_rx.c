@@ -8,12 +8,18 @@
 #include "mgcap.h"
 #include "mgcap_rx.h"
 
+static struct mgc_dev *mgc_dev_get_rcu(const struct net_device *d)
+{
+	return rcu_dereference (d->rx_handler_data);
+}
+
 /* note: already called with rcu_read_lock */
 rx_handler_result_t mgc_handle_frame(struct sk_buff **pskb)
 {
 //	struct mgc_dev *dev = rcu_dereference(skb->dev->rx_handler_data);
 	rx_handler_result_t res = RX_HANDLER_CONSUMED;
 	struct sk_buff *skb = *pskb;
+	struct mgc_dev *mgc = mgc_dev_get_rcu(skb->dev);
 	struct mgc_ring *rxbuf;
 	uint64_t tstamp;
 	uint16_t pktlen;
