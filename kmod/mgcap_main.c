@@ -1,14 +1,16 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/miscdevice.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
 #include <linux/err.h>
 #include <linux/rtnetlink.h>
 #include <linux/wait.h>
+#include <net/genetlink.h>
+
 
 #include "mgcap.h"
 #include "mgcap_rx.h"
+#include "mgcap_netlink.h"
 
 #define MGCAP_VERSION  "0.0.2"
 
@@ -17,7 +19,7 @@
 
 /* Module parameters, defaults. */
 static int debug = 0;
-static char *ifname = "eth0";
+static char *ifname = NULL;
 static int rxbuf_size = 19;
 
 /* Global variables */
@@ -41,11 +43,6 @@ static struct file_operations mgcap_fops = {
 	.poll = mgcap_poll,
 	.unlocked_ioctl = mgcap_ioctl,
 	.release = mgcap_release,
-};
-
-static struct miscdevice mgcap_dev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.fops = &mgcap_fops,
 };
 
 
@@ -221,8 +218,12 @@ int register_mgc_dev(char *ifname)
 
 	/* register character device */
 	sprintf(pathdev, "%s/%s", DRV_NAME, ifname);
-	mgcap_dev.name = pathdev;
-	rc = misc_register(&mgcap_dev);
+	memset(&mgc->mdev, 0, sizeof(mgc->mdev));
+	mgc->mdev.minor = MISC_DYNAMIC_MINOR;
+	mgc->mdev.fops = &mgcap_fops;
+	mgc->mdev.name = pathdev;
+
+	rc = misc_register(&mgc->mdev);
 	if (rc) {
 		pr_err("fail to misc_register (MISC_DYNAMIC_MINOR)\n");
 		goto err;
@@ -261,7 +262,7 @@ int unregister_mgc_dev(struct mgc_dev *mgc)
 		rtnl_unlock();
 	}
 
-	misc_deregister(&mgcap_dev);
+	misc_deregister(&mgc->mdev);
 
 	/* free rx ring buffer */
 	for (i = 0; i < mgc->num_cpus; i++) {
@@ -285,6 +286,111 @@ int unregister_mgc_dev(struct mgc_dev *mgc)
 	return 0;
 }
 
+/* generic netlinkl operations */
+
+static struct genl_family mgcap_nl_family = {
+	.id		= GENL_ID_GENERATE,
+	.name		= MGCAP_GENL_NAME,
+	.version	= MGCAP_GENL_VERSION,
+	.maxattr	= MGCAP_ATTR_MAX,
+	.hdrsize	= 0,
+};
+
+static struct nla_policy mgcap_nl_policy[MGCAP_ATTR_MAX + 1] = {
+	[MGCAP_ATTR_DEVICE]	= { .type = NLA_U32 },
+};
+
+static int
+mgcap_nl_cmd_start(struct sk_buff *skb, struct genl_info *info)
+{
+	int rc;
+	u32 ifindex;
+	struct net_device *dev;
+
+	if (!info) {
+		pr_err("%s: info is null\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!info->attrs[MGCAP_ATTR_DEVICE]) {
+		pr_err("%s: device is not specified.\n", __func__);
+		return -EINVAL;
+	}
+
+	ifindex = nla_get_u32(info->attrs[MGCAP_ATTR_DEVICE]);
+	dev = __dev_get_by_index(&init_net, ifindex);
+
+	if (!dev) {
+		pr_err("%s: ifindex \"%u\" does not exist.\n",
+		       __func__, ifindex);
+		return -ENODEV;
+	}
+
+	if (mgcap_find_dev(&mgcap, dev->name)) {
+		pr_err("%s: device \"%s\" is already mgcaped.\n",
+		       __func__, dev->name);
+		return -EBUSY;
+	}
+
+	rc = register_mgc_dev(dev->name);
+	if (rc < 0) {
+		pr_err("%s: failed to register \"%s\" for mgcap.\n",
+		       __func__, dev->name);
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
+static int
+mgcap_nl_cmd_stop(struct sk_buff *skb, struct genl_info *info)
+{
+	u32 ifindex;
+	struct net_device *dev;
+	struct mgc_dev *mgc;
+
+	if (!info->attrs[MGCAP_ATTR_DEVICE]) {
+		pr_err("%s: device is not specified.\n", __func__);
+		return -EINVAL;
+	}
+
+	ifindex = nla_get_u32(info->attrs[MGCAP_ATTR_DEVICE]);
+	dev = __dev_get_by_index(&init_net, ifindex);
+
+	if (!dev) {
+		pr_err("%s: ifindex \"%u\" does not exist.\n",
+		       __func__, ifindex);
+		return -ENODEV;
+	}
+
+	mgc = mgcap_find_dev(&mgcap, dev->name);
+	if (!mgc) {
+		pr_err("%s: device \"%s\" is not mgcaped.\n",
+		       __func__, dev->name);
+		return -ENOENT;
+	}
+
+	unregister_mgc_dev(mgc);
+
+	return 0;
+}
+
+static struct genl_ops mgcap_nl_ops[] = {
+	{
+		.cmd	= MGCAP_CMD_START,
+		.doit	= mgcap_nl_cmd_start,
+		.policy	= mgcap_nl_policy,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= MGCAP_CMD_STOP,
+		.doit	= mgcap_nl_cmd_stop,
+		.policy	= mgcap_nl_policy,
+		.flags	= GENL_ADMIN_PERM,
+	},
+};
+
+
 static void mgcap_init(struct mgcap *mgcap)
 {
 	INIT_LIST_HEAD(&mgcap->dev_list);
@@ -300,10 +406,22 @@ mgcap_init_module(void)
 	pr_info("mgcap (v%s) is loaded\n", MGCAP_VERSION);
 	mgcap_init(&mgcap);
 
-	rc = register_mgc_dev(ifname);
-	if (rc < 0)
-		mgcap_exit();
+	rc = genl_register_family_with_ops(&mgcap_nl_family, mgcap_nl_ops);
+	if (rc != 0)
+		goto genl_failed;
 
+	if (ifname) {
+		rc = register_mgc_dev(ifname);
+		if (rc < 0)
+			goto modparam_err;
+	}
+
+	return rc;
+
+modparam_err:
+	mgcap_exit();
+	genl_unregister_family(&mgcap_nl_family);
+genl_failed:
 	return rc;
 }
 module_init(mgcap_init_module);
@@ -324,6 +442,7 @@ mgcap_exit(void)
 static void __exit
 mgcap_exit_module(void)
 {
+	genl_unregister_family(&mgcap_nl_family);
 	mgcap_exit();
 	pr_info("mgcap (v%s) is unloaded\n", MGCAP_VERSION);
 

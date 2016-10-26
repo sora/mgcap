@@ -1,6 +1,8 @@
 #ifndef _MGCAP_H_
 #define _MGCAP_H_
 
+#include <linux/miscdevice.h>
+
 #include "mgcap_ring.h"
 
 #undef pr_fmt
@@ -38,6 +40,8 @@ struct mgc_dev {
 	struct rxring *rxrings;
 
 	struct rxring *cur_rxring;
+
+	struct miscdevice mdev;	/* miscdevice structure */
 };
 
 struct mgcap {
