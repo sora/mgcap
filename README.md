@@ -31,6 +31,30 @@ $ # disable HWTstamp
 $ sudo ./mgcap_hwtstamp_config enp1s0f1 0
 ```
 
+**Control mgcap via iproute2**
+```bash
+$ insmod mgcap.ko
+$ cd ../src/iproute2-4.8.0
+$ sudo apt-get install flex bison xtables-addons-source
+$ ./configure
+$ make
+$ ./ip/ip mgcap
+usage:  ip mgcap { start | stop } [ dev DEVICE ]
+
+        ip mgcap set { dev DEVICE } {
+                 mode { mirror | drop } }
+```
+
+To capture loopback device for example,
+execute `ip mgcap start dev lo`. Received packets are copied to
+the character device /dev/mgcap/lo and passed to normal kernel
+network stack by default (mirror mode).
+
+For high performance, use drop mode (received packets are dropped after
+capturing) via `ip mgcap set dev lo mode drop`.
+
+
+
 ## Performance experience
 
 ### Intel X550

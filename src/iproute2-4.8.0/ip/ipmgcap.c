@@ -48,8 +48,8 @@ parse_args(int argc, char **argv, struct mgcap_param *p)
 			NEXT_ARG();
 			if (strcmp(*argv, "drop") == 0) {
 				p->capture_mode = MGCAP_CAPTURE_MODE_DROP;
-			} else if (strcmp(*argv, "pass") == 0) {
-				p->capture_mode = MGCAP_CAPTURE_MODE_PASS;
+			} else if (strcmp(*argv, "mirror") == 0) {
+				p->capture_mode = MGCAP_CAPTURE_MODE_MIRROR;
 			} else {
 				invarg("invalid capture mode", *argv);
 				exit (-1);
@@ -69,7 +69,7 @@ usage(void)
 		"usage:  ip mgcap { start | stop } [ dev DEVICE ]\n"
 		"\n"
 		"        ip mgcap set { dev DEVICE } {\n"
-		"                 mode { drop | pass } }\n"
+		"                 mode { mirror | drop } }\n"
 		);
 	exit (-1);
 }
