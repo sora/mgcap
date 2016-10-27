@@ -35,6 +35,8 @@ struct mgc_dev {
 
 	struct net_device *dev;
 
+	int capture_mode;	/* CAPTURE_MODE_DROP/PASS */
+
 	uint8_t num_cpus;
 
 	struct rxring *rxrings;
