@@ -38,8 +38,7 @@ enum {
 #define MGCAP_ATTR_MAX	(__MGCAP_ATTR_MAX - 1)
 
 /* Capture mode */
-#define MGCAP_CAPTURE_MODE_DROP 1	/* captured packets are dropped */
-#define MGCAP_CAPTURE_MODE_PASS 2	/* captured packets are passed to
-                                         * normal kernel network stack */
+#define MGCAP_CAPTURE_MODE_DROP 	1
+#define MGCAP_CAPTURE_MODE_MIRROR	2
 
 #endif /* _LINUX_MGCAP_NETLINK_H_ */

@@ -230,7 +230,7 @@ int register_mgc_dev(char *ifname)
 	}
 
 	// netdev_rx_handler_register
-	mgc->capture_mode = MGCAP_CAPTURE_MODE_DROP;	/* default */
+	mgc->capture_mode = MGCAP_CAPTURE_MODE_MIRROR;	/* default */
 	rtnl_lock();
 	rc = netdev_rx_handler_register(mgc->dev, mgc_handle_frame, mgc);
 	rtnl_unlock();
@@ -416,17 +416,17 @@ mgcap_nl_cmd_set_capture_mode(struct sk_buff *skb, struct genl_info *info)
 
 	switch (capture_mode) {
 	case MGCAP_CAPTURE_MODE_DROP :
-		pr_info("set device \"%s\" capture mode to drop.\n",
+		pr_info("set device \"%s\" capture mode to drop\n",
 			dev->name);
 		break;
-	case MGCAP_CAPTURE_MODE_PASS :
-		pr_info("set device \"%s\" capture mode to pass.\n",
+	case MGCAP_CAPTURE_MODE_MIRROR :
+		pr_info("set device \"%s\" capture mode to mirror\n",
 			dev->name);
 		break;
 	default:
 		pr_info("invalid capture mode \"%u\" for device \"%s\"\n",
 			capture_mode, dev->name);
-		break;
+		return -EINVAL;
 	}
 
 	mgc->capture_mode = capture_mode;
