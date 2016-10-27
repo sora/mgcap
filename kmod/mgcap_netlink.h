@@ -14,11 +14,13 @@
  * mgcap netlink commands
  *   START (DEVICE): start mgcap for a specified device
  *   STOP (DEVICE):  stop mgcap for a specified evice
+ *   SET_CAPTURE_MODE (DEVICE, MODE): set capture mode, drop or pass
  */
 
 enum {
 	MGCAP_CMD_START,
 	MGCAP_CMD_STOP,
+	MGCAP_CMD_SET_CAPTURE_MODE,
 
 	__MGCAP_CMD_MAX,
 };
@@ -28,12 +30,16 @@ enum {
 /* ATTR types*/
 enum {
 	MGCAP_ATTR_UNSPEC,
-	MGCAP_ATTR_DEVICE,	/* 32bit ifindex */
+	MGCAP_ATTR_DEVICE,		/* 32bit ifindex */
+	MGCAP_ATTR_CAPTURE_MODE,	/* 32bit capture mode */
 
 	__MGCAP_ATTR_MAX,
 };
 #define MGCAP_ATTR_MAX	(__MGCAP_ATTR_MAX - 1)
 
-
+/* Capture mode */
+#define MGCAP_CAPTURE_MODE_DROP 1	/* captured packets are dropped */
+#define MGCAP_CAPTURE_MODE_PASS 2	/* captured packets are passed to
+                                         * normal kernel network stack */
 
 #endif /* _LINUX_MGCAP_NETLINK_H_ */

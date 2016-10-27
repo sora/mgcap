@@ -230,6 +230,7 @@ int register_mgc_dev(char *ifname)
 	}
 
 	// netdev_rx_handler_register
+	mgc->capture_mode = MGCAP_CAPTURE_MODE_DROP;	/* default */
 	rtnl_lock();
 	rc = netdev_rx_handler_register(mgc->dev, mgc_handle_frame, mgc);
 	rtnl_unlock();
@@ -297,7 +298,8 @@ static struct genl_family mgcap_nl_family = {
 };
 
 static struct nla_policy mgcap_nl_policy[MGCAP_ATTR_MAX + 1] = {
-	[MGCAP_ATTR_DEVICE]	= { .type = NLA_U32 },
+	[MGCAP_ATTR_DEVICE]		= { .type = NLA_U32 },
+	[MGCAP_ATTR_CAPTURE_MODE]	= { .type = NLA_U32 },
 };
 
 static int
@@ -375,6 +377,63 @@ mgcap_nl_cmd_stop(struct sk_buff *skb, struct genl_info *info)
 	return 0;
 }
 
+static int
+mgcap_nl_cmd_set_capture_mode(struct sk_buff *skb, struct genl_info *info)
+{
+	u32 ifindex;
+	u32 capture_mode;
+	struct net_device *dev;
+	struct mgc_dev *mgc;
+
+	if (!info->attrs[MGCAP_ATTR_DEVICE]) {
+		pr_err("%s: device is not specified.\n", __func__);
+		return -EINVAL;
+	}
+
+	ifindex = nla_get_u32(info->attrs[MGCAP_ATTR_DEVICE]);
+	dev = __dev_get_by_index(&init_net, ifindex);
+
+	if (!dev) {
+		pr_err("%s: ifindex \"%u\" does not exist.\n",
+		       __func__, ifindex);
+		return -ENODEV;
+	}
+
+	if (!info->attrs[MGCAP_ATTR_CAPTURE_MODE]) {
+		pr_err("%s: capture mode is not specified.\n", __func__);
+		return -EINVAL;
+	}
+
+	capture_mode = nla_get_u32(info->attrs[MGCAP_ATTR_CAPTURE_MODE]);
+
+
+	mgc = mgcap_find_dev(&mgcap, dev->name);
+	if (!mgc) {
+		pr_err("%s: device \"%s\" is not mgcaped.\n",
+		       __func__, dev->name);
+		return -ENOENT;
+	}
+
+	switch (capture_mode) {
+	case MGCAP_CAPTURE_MODE_DROP :
+		pr_info("set device \"%s\" capture mode to drop.\n",
+			dev->name);
+		break;
+	case MGCAP_CAPTURE_MODE_PASS :
+		pr_info("set device \"%s\" capture mode to pass.\n",
+			dev->name);
+		break;
+	default:
+		pr_info("invalid capture mode \"%u\" for device \"%s\"\n",
+			capture_mode, dev->name);
+		break;
+	}
+
+	mgc->capture_mode = capture_mode;
+
+	return 0;
+}
+
 static struct genl_ops mgcap_nl_ops[] = {
 	{
 		.cmd	= MGCAP_CMD_START,
@@ -385,6 +444,12 @@ static struct genl_ops mgcap_nl_ops[] = {
 	{
 		.cmd	= MGCAP_CMD_STOP,
 		.doit	= mgcap_nl_cmd_stop,
+		.policy	= mgcap_nl_policy,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= MGCAP_CMD_SET_CAPTURE_MODE,
+		.doit	= mgcap_nl_cmd_set_capture_mode,
 		.policy	= mgcap_nl_policy,
 		.flags	= GENL_ADMIN_PERM,
 	},

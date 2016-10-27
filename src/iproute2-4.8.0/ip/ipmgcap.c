@@ -22,6 +22,7 @@ static int genl_family = -1;
 
 struct mgcap_param {
 	__u32 ifindex;
+	__u32 capture_mode;
 };
 
 static void usage(void) __attribute ((noreturn));
@@ -39,7 +40,18 @@ parse_args(int argc, char **argv, struct mgcap_param *p)
                         NEXT_ARG();
 			p->ifindex = if_nametoindex(*argv);
 			if (!p->ifindex) {
-				invarg ("invalid device", *argv);
+				invarg("invalid device", *argv);
+				exit (-1);
+			}
+		}
+		if (strcmp(*argv, "mode") == 0) {
+			NEXT_ARG();
+			if (strcmp(*argv, "drop") == 0) {
+				p->capture_mode = MGCAP_CAPTURE_MODE_DROP;
+			} else if (strcmp(*argv, "pass") == 0) {
+				p->capture_mode = MGCAP_CAPTURE_MODE_PASS;
+			} else {
+				invarg("invalid capture mode", *argv);
 				exit (-1);
 			}
 		}
@@ -53,7 +65,12 @@ parse_args(int argc, char **argv, struct mgcap_param *p)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage:  ip mgcap { start | stop } [ dev DEVICE ]\n");
+	fprintf(stderr,
+		"usage:  ip mgcap { start | stop } [ dev DEVICE ]\n"
+		"\n"
+		"        ip mgcap set { dev DEVICE } {\n"
+		"                 mode { drop | pass } }\n"
+		);
 	exit (-1);
 }
 
@@ -103,16 +120,52 @@ do_stop(int argc, char **argv)
 	return 0;
 }
 
+static int
+do_set_mode(struct mgcap_param p)
+{
+	GENL_REQUEST(req, 1024, genl_family, 0, MGCAP_GENL_VERSION,
+		     MGCAP_CMD_SET_CAPTURE_MODE, NLM_F_REQUEST | NLM_F_ACK);
+
+	addattr32(&req.n, 1024, MGCAP_ATTR_DEVICE, p.ifindex);
+	addattr32(&req.n, 1024, MGCAP_ATTR_CAPTURE_MODE, p.capture_mode);
+
+	if (rtnl_talk(&genl_rth, &req.n, NULL, 0) < 0)
+		return -2;
+
+	return 0;
+}
+
+static int
+do_set(int argc, char **argv)
+{
+
+	struct mgcap_param p;
+
+	parse_args(argc, argv, &p);
+
+	if (!p.ifindex) {
+		fprintf(stderr, "dev must be specified\n");
+		exit(-1);
+	}
+
+	if (p.capture_mode) {
+		/* set capture mode of the device */
+		return do_set_mode(p);
+	}
+
+	fprintf(stderr, "invalid arguments.\n");
+	exit(1);
+}
+
 int
 do_ipmgcap(int argc, char **argv)
 {
         if (genl_family < 0) {
-		if (rtnl_open_byproto (&genl_rth, 0, NETLINK_GENERIC)< 0) {
-			fprintf (stderr, "Can't open genetlink socket\n");
+		if (rtnl_open_byproto(&genl_rth, 0, NETLINK_GENERIC)< 0) {
+			fprintf(stderr, "Can't open genetlink socket\n");
 			exit (1);
 		}
-		genl_family = genl_resolve_family (&genl_rth,
-						   MGCAP_GENL_NAME);
+		genl_family = genl_resolve_family(&genl_rth, MGCAP_GENL_NAME);
 		if (genl_family < 0)
 			exit (1);
 	}
@@ -124,13 +177,15 @@ do_ipmgcap(int argc, char **argv)
 		return do_start(argc - 1, argv + 1);
 	if (matches(*argv, "stop") == 0)
 		return do_stop(argc - 1, argv + 1);
+	if (matches(*argv, "set") == 0)
+		return do_set(argc - 1, argv + 1);
 	if (matches(*argv, "help") == 0) {
 		usage();
 		return -1;
 	}
 
-        fprintf (stderr, "Command \"%s\" is unknown, try \"ip nsh help\".\n",
-		 *argv);
+        fprintf(stderr, "Command \"%s\" is unknown, try \"ip nsh help\".\n",
+		*argv);
 
 	return -1;
 }
