@@ -1,0 +1,21 @@
+language: c
+
+compiler:
+  - clang
+  - gcc
+cache:
+  - apt
+os:
+  - linux
+
+before_install:
+  # update packages
+  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update -qq -y; fi
+  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y build-essential cmake libtool linux-headers-3.13.0-92 linux-headers-3.13.0-92-generic linux-headers-generic  ; fi
+
+before_script:  
+  - cd kmod && make && cd ..
+
+script:
+  - sudo insmod kmod/mgcap.ko
+  - sudo rmmod mgcap
