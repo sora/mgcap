@@ -70,14 +70,17 @@ $ cd ../src/iproute2-4.8.0
 $ sudo ./ip/ip mgcap start dev enp1s0f1
 $ sudo ./ip/ip mgcap set dev enp1s0f1 mode drop
 $ cd ../mgdump
-$ # no-hwtstamp
+
+# no-hwtstamp
 $ sudo ../tools/mgcap_hwtstamp_config enp1s0f1 0
 $ sudo ./mgdump /dev/mgcap/enp1s0f1 
 $ # pkt-gen from the Sender
-$ # hwtstamp
+
+# hwtstamp
 $ sudo ../tools/mgcap_hwtstamp_config enp1s0f1 1
 $ sudo ./mgdump /dev/mgcap/enp1s0f1 
 $ # pkt-gen from the Sender
+
 $ sudo rmmod mgcap
 ```
 
