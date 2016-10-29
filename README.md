@@ -73,16 +73,16 @@ $ sudo rmmod mgcap
 ```
 
 **Result (128B, MAX=8,445,945 pps)**
-* Multiple-queue traffic with no-hwtstamp: 8,428,798 pps
-* Single-queue traffic with no-hwtstamp: 5,273,111 pps
-* Multiple-queue traffic with hwtstamp: 7,858,722 pps
-* Single-queue traffic with hwtstamp: 3,872,648 pps
+* Multiple-queue traffic with no-hwtstamp: 8,428,798 pps (99.7%)
+* Single-queue traffic with no-hwtstamp: 5,273,111 pps (62.4%)
+* Multiple-queue traffic with hwtstamp: 7,858,722 pps (93.0%)
+* Single-queue traffic with hwtstamp: 3,872,648 pps (45.8%)
 
 **Result (256B, MAX=4,528,985 pps)**
-* Multiple-queue traffic with no-hwtstamp: 4,521,520 pps
-* Single-queue traffic with no-hwtstamp: 4,383,530 pps
-* Multiple-queue traffic with hwtstamp: 4,526,545 pps
-* Single-queue traffic with hwtstamp: 2,920,175 pps
+* Multiple-queue traffic with no-hwtstamp: 4,521,520 pps (99.8%)
+* Single-queue traffic with no-hwtstamp: 4,383,530 pps (96.7%)
+* Multiple-queue traffic with hwtstamp: 4,526,545 pps (99.9%)
+* Single-queue traffic with hwtstamp: 2,920,175 pps (64.4%)
 
 ## Spec
 
