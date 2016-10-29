@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 	unsigned short pktlen;
 	unsigned long tstamp;
 
-	int i, copy_len, fdi, fdo, count, numpkt;
+	int i, copy_len, copy_sum, fdi, fdo, count, numpkt;
 	char *pi, *po;
 
 	if (argc != 2 || (strlen(argv[1]) >= (11 + IFNAMSIZ))) {
@@ -194,6 +194,7 @@ int main(int argc, char **argv)
 
 		pi = &ibuf[0];
 		po = &obuf[0];
+		copy_sum = 0;
 		for (i = 0; i < numpkt; i++) {
 			pktlen = *(unsigned short *)&pi[0];
 			tstamp = *(unsigned long *)&pi[2];
@@ -206,10 +207,11 @@ int main(int argc, char **argv)
 			copy_len = pcapng_epb_memcpy(po, pi, pktlen, tstamp);
 			pi += MGC_SNAPLEN;
 			po += copy_len;
+			copy_sum += copy_len;
 		}
 
 		// dump to file
-		count = write(fdo, obuf, count);
+		count = write(fdo, obuf, copy_sum);
 
 		mgdump_stat.packet_count += numpkt;
 	}
