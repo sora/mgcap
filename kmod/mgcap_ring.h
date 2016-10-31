@@ -50,11 +50,12 @@
 #define RING_MALLOC_SIZE          (RING_SIZE + (MGC_DATASLOT_SIZE * NBULK_PKT))
 
 struct mgc_ring {
-	uint8_t *write;
-	uint8_t *read;
-	uint8_t *start;
-	uint8_t *end;
-	uint32_t mask;
+	uint8_t *p;        /* malloc pointer */
+	uint8_t *start;    /* start address */
+	uint8_t *write;    /* write pointer */
+	uint8_t *read;     /* read pointer */
+	uint8_t *end;      /* end address */
+	uint32_t mask;     /* bit mask of ring buffer */
 };
 
 static inline uint32_t ring_count(const struct mgc_ring *r)

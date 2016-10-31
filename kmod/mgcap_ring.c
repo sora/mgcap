@@ -8,10 +8,11 @@ int mgc_ring_malloc(struct mgc_ring *buf, int cpu)
 {
 	int ret = 0;
 
-	if ((buf->start = kmalloc_node(RING_SIZE, GFP_KERNEL, cpu_to_node(cpu))) == 0) {
+	if ((buf->p = kmalloc_node(RING_SIZE, GFP_KERNEL, cpu_to_node(cpu))) == 0) {
 		ret = -1;
 		goto err;
 	}
+	buf->start = buf->p;
 	buf->end   = buf->start + RING_SIZE;
 	buf->write = buf->start;
 	buf->read  = buf->start;

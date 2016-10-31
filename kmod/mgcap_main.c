@@ -147,7 +147,7 @@ mgcap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 int register_mgc_dev(char *ifname)
 {
 	char pathdev[IFNAMSIZ];
-	int rc, cpu, i;
+	int rc, i;
 	struct net_device *dev;
 	struct mgc_dev *mgc;
 
@@ -182,27 +182,23 @@ int register_mgc_dev(char *ifname)
 	}
 	
 	/* malloc mgc_dev->rx->buf */
-	for_each_online_cpu(cpu) {
-		mgc->rxrings[cpu].cpuid = cpu;
-		rc = mgc_ring_malloc(&mgc->rxrings[cpu].buf, cpu);
-		if (rc < 0) {
-			pr_err("fail to kmalloc: *mgc_ring[%d]\n", cpu);
-			goto err;
-		}
-		pr_info("cpu=%d, st: %p, wr: %p, rd: %p, end: %p\n",
-			cpu,
-			mgc->rxrings[i].buf.start, mgc->rxrings[i].buf.write,
-			mgc->rxrings[i].buf.read,  mgc->rxrings[i].buf.end);
-	}
 	for (i = 0; i < MAX_CPUS; i++) {
-		if (mgc->rxrings[i].buf.start == NULL) {
-			pr_info("cpu%d is offilne.\n", i);
-
-			// set cpu 0 when this cpu is offline
-			if ((mgc->rxrings[i].buf.start = kmalloc_node(RING_SIZE,
-				GFP_KERNEL, cpu_to_node(0))) == 0) {
+		if (cpu_online(i)) {
+			mgc->rxrings[i].cpuid = i;
+			rc = mgc_ring_malloc(&mgc->rxrings[i].buf, i);
+			if (rc < 0) {
+				pr_err("fail to kmalloc: *mgc_ring[%d]\n", i);
 				goto err;
 			}
+			pr_info("cpu=%d, p: %p, st: %p, wr: %p, rd: %p, end: %p\n",
+				i, mgc->rxrings[i].buf.p,
+				mgc->rxrings[i].buf.start, mgc->rxrings[i].buf.write,
+				mgc->rxrings[i].buf.read,  mgc->rxrings[i].buf.end);
+		} else {
+			pr_info("cpu%d is offline.", i);
+
+			// set cpu 0 when this cpu is offline
+			mgc->rxrings[i].buf.start = mgc->rxrings[0].buf.start;
 			mgc->rxrings[i].buf.end   = mgc->rxrings[0].buf.end;
 			mgc->rxrings[i].buf.write = mgc->rxrings[0].buf.write;
 			mgc->rxrings[i].buf.read  = mgc->rxrings[0].buf.read;
@@ -269,9 +265,10 @@ int unregister_mgc_dev(struct mgc_dev *mgc)
 
 	/* free rx ring buffer */
 	for (i = 0; i < MAX_CPUS; i++) {
-		if (mgc->rxrings[i].buf.start != NULL) {
-			kfree(mgc->rxrings[i].buf.start);
-			mgc->rxrings[i].buf.start = NULL;
+		if (mgc->rxrings[i].buf.p != NULL) {
+			pr_info("kfree: cpu%d\n", i);
+			kfree(mgc->rxrings[i].buf.p);
+			mgc->rxrings[i].buf.p = NULL;
 		}
 	}
 
