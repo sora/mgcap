@@ -106,6 +106,7 @@ mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 		pr_err("copy_to_user failed\n");
 		return -EFAULT;
 	}
+	ring_read_next(&rx->buf, copy_len);
 
 	return copy_len;
 }
