@@ -195,9 +195,8 @@ int register_mgc_dev(char *ifname)
 				mgc->rxrings[i].buf.start, mgc->rxrings[i].buf.write,
 				mgc->rxrings[i].buf.read,  mgc->rxrings[i].buf.end);
 		} else {
-			pr_info("cpu%d is offline.", i);
-
 			// set cpu 0 when this cpu is offline
+			mgc->rxrings[i].buf.p     = NULL;
 			mgc->rxrings[i].buf.start = mgc->rxrings[0].buf.start;
 			mgc->rxrings[i].buf.end   = mgc->rxrings[0].buf.end;
 			mgc->rxrings[i].buf.write = mgc->rxrings[0].buf.write;
