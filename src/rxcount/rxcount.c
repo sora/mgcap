@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 
 	cpu_set_t cpu_set;
 	int ncpus, ret, i, fdi;
-	unsigned int sum;
+	unsigned int sum, pre_sum;
 
 	char ifname[11 + IFNAMSIZ];
 
@@ -211,6 +211,7 @@ int main(int argc, char **argv)
 	// set signal handler
 	set_signal(SIGINT);
 
+	pre_sum = 0;
 	while (1) {
 		if (caught_signal)
 			break;
@@ -219,11 +220,12 @@ int main(int argc, char **argv)
 		for (i = 0; i < 20; i++) {
 			if (CPU_ISSET(i, &cpu_set)) {
 				sum += thdata[i].stat_pktcount;
-				printf("\t%d:%u", i, thdata[i].stat_pktcount);
+				printf("%d:%u\t", i, thdata[i].stat_pktcount);
 			}
 		}
 		//printf("recv packets: %u pps\n", sum);
-		printf("\n");
+		printf("sum:%u\tpps:%u\n", sum, (sum - pre_sum));
+		pre_sum = sum;
 
 		sleep(1);
 	}
