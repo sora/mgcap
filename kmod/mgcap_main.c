@@ -86,37 +86,28 @@ mgcap_poll(struct file* filp, poll_table* wait)
 static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
-	unsigned int copy_len, read_count;
 	struct mgc_dev *mgc = (struct mgc_dev *)filp->private_data;
-	struct rxring *rx = mgc->cur_rxring;
+	unsigned int copy_len, read_count;
+	struct rxring *rx;
 
-	uint8_t ring_budget = mgc->num_cpus;
+	rx = &mgc->rxrings[smp_processor_id()];
 
-	while(ring_budget--) {
-		if (ring_empty(&rx->buf)) {
-			rx = next_rxring(rx);
-			continue;
-		}
-
-		read_count = ring_count_end(&rx->buf);
-		if (count > read_count)
-			copy_len = read_count;
-		else
-			copy_len = count;
-
-		if (copy_to_user(buf, rx->buf.read, copy_len)) {
-			pr_err("copy_to_user failed\n");
-			return -EFAULT;
-		}
-		ring_read_next(&rx->buf, copy_len);
-
-		//mgc->cur_rxring = next_rxring(rx);
-
-		return copy_len;
+	if (ring_empty(&rx->buf)) {
+		return 0;
 	}
-	mgc->cur_rxring = rx;
 
-	return 0;
+	read_count = ring_count_end(&rx->buf);
+	if (count > read_count)
+		copy_len = read_count;
+	else
+		copy_len = count;
+
+	if (copy_to_user(buf, rx->buf.read, copy_len)) {
+		pr_err("copy_to_user failed\n");
+		return -EFAULT;
+	}
+
+	return copy_len;
 }
 
 static long
@@ -184,30 +175,41 @@ int register_mgc_dev(char *ifname)
 	pr_info("mgc->num_cpus: %d\n", mgc->num_cpus);
 
 	/* malloc mgc_dev->rx */
-	mgc->rxrings = kmalloc(sizeof(struct rxring) * mgc->num_cpus,
-			       GFP_KERNEL);
+	mgc->rxrings = kmalloc(sizeof(struct rxring) * MAX_CPUS, GFP_KERNEL);
 	if (mgc->rxrings == 0) {
 		pr_err("fail to kmalloc: *mgc_dev->rx\n");
 		goto err;
 	}
 	
 	/* malloc mgc_dev->rx->buf */
-	i = 0;
 	for_each_online_cpu(cpu) {
-		mgc->rxrings[i].cpuid = cpu;
-		rc = mgc_ring_malloc(&mgc->rxrings[i].buf, cpu);
+		mgc->rxrings[cpu].cpuid = cpu;
+		rc = mgc_ring_malloc(&mgc->rxrings[cpu].buf, cpu);
 		if (rc < 0) {
-			pr_err("fail to kmalloc: *mgc_ring[%d], cpu=%d\n", i, cpu);
+			pr_err("fail to kmalloc: *mgc_ring[%d]\n", cpu);
 			goto err;
 		}
-		mgc->rxrings[i].next = &mgc->rxrings[(i + 1) % mgc->num_cpus];
-		pr_info("cpu=%d, rxbuf[%d], st: %p, wr: %p, rd: %p, end: %p\n",
-			cpu, i,
+		pr_info("cpu=%d, st: %p, wr: %p, rd: %p, end: %p\n",
+			cpu,
 			mgc->rxrings[i].buf.start, mgc->rxrings[i].buf.write,
 			mgc->rxrings[i].buf.read,  mgc->rxrings[i].buf.end);
-
-		++i;
 	}
+	for (i = 0; i < MAX_CPUS; i++) {
+		if (mgc->rxrings[i].buf.start == NULL) {
+			pr_info("cpu%d is offilne.\n", i);
+
+			// set cpu 0 when this cpu is offline
+			if ((mgc->rxrings[i].buf.start = kmalloc_node(RING_SIZE,
+				GFP_KERNEL, cpu_to_node(0))) == 0) {
+				goto err;
+			}
+			mgc->rxrings[i].buf.end   = mgc->rxrings[0].buf.end;
+			mgc->rxrings[i].buf.write = mgc->rxrings[0].buf.write;
+			mgc->rxrings[i].buf.read  = mgc->rxrings[0].buf.read;
+			mgc->rxrings[i].buf.mask  = mgc->rxrings[0].buf.mask;
+		}
+	}
+	
 
 	/* mgc_dev->cur_rxring */
 	mgc->cur_rxring = &mgc->rxrings[0];
@@ -266,8 +268,8 @@ int unregister_mgc_dev(struct mgc_dev *mgc)
 	misc_deregister(&mgc->mdev);
 
 	/* free rx ring buffer */
-	for (i = 0; i < mgc->num_cpus; i++) {
-		if (mgc->rxrings[i].buf.start) {
+	for (i = 0; i < MAX_CPUS; i++) {
+		if (mgc->rxrings[i].buf.start != NULL) {
 			kfree(mgc->rxrings[i].buf.start);
 			mgc->rxrings[i].buf.start = NULL;
 		}
