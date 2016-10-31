@@ -5,6 +5,10 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <signal.h>
+
+/* Global variables */
+static int caught_signal = 0;
 
 struct thdata {
 	int cpu;
@@ -12,6 +16,30 @@ struct thdata {
 	sem_t ready;
 };
 
+/*
+ * sig_handler
+ * @sig:
+ */
+void sig_handler(int sig) {
+	if (sig == SIGINT)
+		caught_signal = 1;
+}
+
+/*
+ *  set_signal
+ *  @sig:
+ */
+void set_signal(int sig) {
+	if (signal(sig, sig_handler) == SIG_ERR) {
+		fprintf(stderr, "Cannot set signal\n");
+		exit(1);
+	}
+}
+
+/*
+ * count_online_cpus
+ * 
+ */
 int count_online_cpus(cpu_set_t *cpu_set)
 {
 	int ret, count = 0;
@@ -24,13 +52,15 @@ int count_online_cpus(cpu_set_t *cpu_set)
 	return count;
 }
 
+/*
+ * rx_thread
+ * 
+ */
 void *rx_thread(void *arg)
 {
 	struct thdata *priv = (struct thdata *)arg;
 	cpu_set_t target_cpu_set;
 	pthread_t cur_thread;
-
-	printf ("0: target_cpu=%d, cur_cpu=%d\n", priv->cpu, sched_getcpu());
 
 	CPU_ZERO(&target_cpu_set);
 	CPU_SET(priv->cpu, &target_cpu_set);
@@ -38,15 +68,26 @@ void *rx_thread(void *arg)
 
 	// set this thread on target cpu core
 	pthread_setaffinity_np(cur_thread, sizeof(cpu_set_t), &target_cpu_set);
+	printf("thread %d: start. cur_cpu=%d\n", priv->cpu, sched_getcpu());
 
-	printf ("1: target_cpu=%d, cur_cpu=%d\n", priv->cpu, sched_getcpu());
-
-	sleep(1);
 	sem_post(&priv->ready);
+
+	while (1) {
+		if (caught_signal)
+			break;
+		
+		printf("thread %d: ping\n", priv->cpu);
+		sleep(1);
+	}
 	
+	printf("thread %d: finished.\n", priv->cpu);
 	return NULL;
 }
 
+/*
+ * main
+ * 
+ */
 int main(void)
 {
 	struct thdata *thdata;
@@ -87,6 +128,16 @@ int main(void)
 			}
 			sem_wait(&thdata[i].ready);
 		}
+	}
+
+	// st signal handler
+	set_signal(SIGINT);
+
+	while (1) {
+		if (caught_signal)
+			break;
+
+		sleep(1);
 	}
 
 	// thread join
