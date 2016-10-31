@@ -8,6 +8,7 @@
 
 struct thdata {
 	int cpu;
+	int ncpus;
 	sem_t ready;
 };
 
@@ -26,30 +27,25 @@ int count_online_cpus(cpu_set_t *cpu_set)
 void *rx_thread(void *arg)
 {
 	struct thdata *priv = (struct thdata *)arg;
-	printf ("cpu%d\n", priv->cpu);
+	cpu_set_t target_cpu_set;
+	pthread_t cur_thread;
 
-	sleep(2);
+	printf ("0: target_cpu=%d, cur_cpu=%d\n", priv->cpu, sched_getcpu());
 
+	CPU_ZERO(&target_cpu_set);
+	CPU_SET(priv->cpu, &target_cpu_set);
+	cur_thread = pthread_self();
+
+	// set this thread on target cpu core
+	pthread_setaffinity_np(cur_thread, sizeof(cpu_set_t), &target_cpu_set);
+
+	printf ("1: target_cpu=%d, cur_cpu=%d\n", priv->cpu, sched_getcpu());
+
+	sleep(1);
 	sem_post(&priv->ready);
 	
 	return NULL;
 }
-
-#if 0
-int stick_this_thread_to_core(int core_id) {
-	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-	if (core_id < 0 || core_id >= num_cores)
-		return EINVAL;
-
-	cpu_set_t cpuset;
-	CPU_ZERO(&cpuset);
-	CPU_SET(core_id, &cpuset);
-
-	pthread_t current_thread = pthread_self();    
-
-	return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
-}
-#endif
 
 int main(void)
 {
@@ -81,6 +77,7 @@ int main(void)
 	for (i = 0; i < CPU_SETSIZE; i++) {
 		if (CPU_ISSET(i, &cpu_set)) {
 			thdata[i].cpu = i;
+			thdata[i].ncpus = ncpus;
 			sem_init(&thdata[i].ready, 0, 0);
 
 			ret = pthread_create(&rxth[i], NULL, rx_thread, &thdata[i]);
