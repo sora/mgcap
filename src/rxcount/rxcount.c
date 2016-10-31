@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sched.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -27,7 +28,7 @@ void *rx_thread(void *arg)
 	struct thdata *priv = (struct thdata *)arg;
 	printf ("cpu%d\n", priv->cpu);
 
-	sleep(3);
+	sleep(2);
 
 	sem_post(&priv->ready);
 	
@@ -52,44 +53,55 @@ int stick_this_thread_to_core(int core_id) {
 
 int main(void)
 {
-	pthread_t rxth0, rxth1;
-	cpu_set_t cpu_set;
-	int ncpus, ret;
-	struct thdata th0, th1;
+	struct thdata *thdata;
+	pthread_t *rxth;
 
-	// initialize
+	cpu_set_t cpu_set;
+	int ncpus, ret, i;
+
+	// count number of online cpus
 	CPU_ZERO(&cpu_set);
 	ncpus = count_online_cpus(&cpu_set);
-	
-	sem_init(&th0.ready, 0, 0);
-	sem_init(&th1.ready, 0, 0);
-
 	printf("ncpus=%d\n", ncpus);
+	
+	// malloc pthread
+	rxth = calloc(sizeof(pthread_t), ncpus);
+	if (rxth == NULL) {
+		perror("calloc() rxth");
+		return 1;
+	}
 
-//	for (i = 0; i < CPU_SETSIZE; i++) {
-//		if (CPU_ISSET(i, &cpu_set)) {
-			th0.cpu = 1;
-			ret = pthread_create(&rxth0, NULL, rx_thread, &th0);
+	// malloc thdata
+	thdata = calloc(sizeof(struct thdata), ncpus);
+	if (thdata == NULL) {
+		perror("calloc() thdata");
+		return 1;
+	}
+
+	for (i = 0; i < CPU_SETSIZE; i++) {
+		if (CPU_ISSET(i, &cpu_set)) {
+			thdata[i].cpu = i;
+			sem_init(&thdata[i].ready, 0, 0);
+
+			ret = pthread_create(&rxth[i], NULL, rx_thread, &thdata[i]);
 			if (ret) {
 				perror("pthread create");
 				return 1;
 			}
-			sem_wait(&th0.ready);
+			sem_wait(&thdata[i].ready);
+		}
+	}
 
-			th1.cpu = 2;
-			ret = pthread_create(&rxth1, NULL, rx_thread, &th1);
-			if (ret) {
-				perror("pthread create");
-				return 1;
-			}
-			sem_wait(&th1.ready);
+	// thread join
+	for (i = 0; i < CPU_SETSIZE; i++) {
+		if (CPU_ISSET(i, &cpu_set)) {
+			pthread_join(rxth[i], NULL);
+		}
+	}
 
-//		}
-//	}
-
-	pthread_join(rxth0, NULL);
-	pthread_join(rxth1, NULL);
-
+	free(thdata);
+	free(rxth);
+	
 	return 0;
 }
 
