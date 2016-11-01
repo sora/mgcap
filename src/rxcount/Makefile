@@ -1,10 +1,10 @@
-TARGET = mgdump
+TARGET = rxcount
 
 CFLAGS = -Wall -O2
 LDFLAGS= -pthread
 CC=gcc
 
-SRCS := mgdump.c
+SRCS := rxcount.c
 OBJS = $(subst .c,.o,$(SRCS))
 
 ${TARGET}: ${OBJS}
