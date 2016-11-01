@@ -1,26 +1,24 @@
+#define _GNU_SOURCE
 #include <stdio.h>
-#include <string.h>
-#include <errno.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sched.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <signal.h>
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <linux/if.h>
 
-#define MGC_HDRLEN       (10)
-#define ETH_HDRLEN       (14)
-#define MGC_SNAPLEN      (128)
+#include <semaphore.h>
+#include <pthread.h>
+#include <signal.h>
 
-//#define INTERVAL_100MSEC    100000
+#define MGC_HDRLEN          10
+#define MGC_SLOTLEN         128
 #define INTERVAL_100USEC    100
-
 
 /* PCAP-NG header
  * from https://github.com/the-tcpdump-group/libpcap */
@@ -75,6 +73,11 @@ struct mgdump_statistics {
 	uint32_t packet_count;
 };
 
+struct thdata {
+	int cpu;
+	int ncpus;
+	int fdi;
+	sem_t ready;
+	unsigned int stat_pktcount;
+};
 
-void sig_handler(int sig);
-void set_signal(int sig);
