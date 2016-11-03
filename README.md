@@ -1,5 +1,7 @@
 # mgcap
-A high-performance capturing device for traffic monitoring
+A Multithread PcapNG capturing tool with Hardware timestamping
+
+<image src="https://raw.githubusercontent.com/wiki/sora/mgcap/images/mgcap-overview.png" width="80%" height="80%">
 
 ## Features
 * Support any Linux network device
