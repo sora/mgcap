@@ -78,19 +78,20 @@ int mgcap_next(mgcap_t* mg, void** pktptr, mgcap_hdr* hdr) {
 		}
 
 		mg->read_size_ = rc;
-		printf("read: %d\n", mg->read_size_);
 		
 		if (mg->read_size_ <= 0) {
 			strerror_r(errno, mg->errmsg_, MGCAP_ERR_LEN);
-			return -1;			
+			return -1;
 		}
 		mg->cursol_ = &(mg->ibuf_[0]);
 		// printf("read size: %d (%d, %d)\n", mg->read_size_, mg->read_size_ / MGC_SNAPLEN,
 		// mg->read_size_ % MGC_SNAPLEN);
 	}
-	
-	memcpy(hdr, mg->cursol_, sizeof(mgcap_hdr));
-	mg->cursol_ += sizeof(mgcap_hdr);
+
+	hdr->pktlen_ = *((uint16_t*)mg->cursol_);
+	mg->cursol_ += sizeof(hdr->pktlen_);
+	hdr->timestamp_ = *((uint64_t*)mg->cursol_);
+	mg->cursol_ += sizeof(hdr->timestamp_);
 	*pktptr = mg->cursol_;
 	mg->cursol_ += MGC_SNAPLEN - sizeof(mgcap_hdr);
  

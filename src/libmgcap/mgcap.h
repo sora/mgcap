@@ -5,10 +5,12 @@
 
 typedef struct mgcap_ mgcap_t;
 
-typedef struct mgcap_hdr_ {
+struct mgcap_hdr_ {
 	uint16_t pktlen_;
-	uint32_t timestamp_;
-} mgcap_hdr;
+	uint64_t timestamp_;
+};
+
+typedef struct mgcap_hdr_ mgcap_hdr;
 
 mgcap_t* new_mgcap();
 void destroy_mgcap(mgcap_t* mg);
