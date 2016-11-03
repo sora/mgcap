@@ -7,8 +7,7 @@ typedef struct mgcap_ mgcap_t;
 
 typedef struct mgcap_hdr_ {
 	uint16_t pktlen_;
-	uint32_t ts_high_;
-	uint32_t ts_low_;
+	uint32_t timestamp_;
 } mgcap_hdr;
 
 mgcap_t* new_mgcap();
