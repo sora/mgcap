@@ -87,12 +87,11 @@ static ssize_t
 mgcap_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct mgc_dev *mgc = (struct mgc_dev *)filp->private_data;
+	struct rxring *rx = &mgc->rxrings[smp_processor_id()];
 	unsigned int copy_len, read_count;
-	struct rxring *rx;
-
-	rx = &mgc->rxrings[smp_processor_id()];
 
 	if (ring_empty(&rx->buf)) {
+		cpu_relax();
 		return 0;
 	}
 

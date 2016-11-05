@@ -9,14 +9,13 @@
 /*
  * memory management
  *
- *  a         b             c           d       e
- *  |---------+-------------+-----------|-------|
+ *  a         b             c           d
+ *  |---------+-------------+-----------|
  *
  *  a: ring->start (start address)
  *  b: ring->read (read pointer)
  *  c: ring->write (write pointer)
  *  d: ring->end (end address)
- *  e: malloc size (ring->end + MAX_PKT_SIZE * (NBULK + 1))
  *
  *  ring->mask := ring->size - 1
  */
@@ -46,8 +45,6 @@
 #define MGC_DATASLOT_SIZE         128
 #define RING_SIZE                 (MGC_DATASLOT_SIZE * 4096 * 8)       // 2^n
 #define NBULK_PKT                 1
-#define RING_ALMOST_FULL          (MGC_DATASLOT_SIZE * 2)
-#define RING_MALLOC_SIZE          (RING_SIZE + (MGC_DATASLOT_SIZE * NBULK_PKT))
 
 struct mgc_ring {
 	uint8_t *p;        /* malloc pointer */
@@ -66,9 +63,11 @@ static inline uint32_t ring_count(const struct mgc_ring *r)
 static inline uint32_t ring_count_end(const struct mgc_ring *r)
 {
 	uint32_t readable_len, ring_count;
+	const uint8_t *wr = r->write;
+	const uint8_t *rd = r->read;
 
-	readable_len = r->end - r->read;
-	ring_count = (r->write - r->read) & r->mask;
+	readable_len = r->end - rd;
+	ring_count = (wr - rd) & r->mask;
 
 	return (ring_count > readable_len) ? readable_len : ring_count;
 }
@@ -83,27 +82,31 @@ static inline bool ring_empty(const struct mgc_ring *r)
 	return !!(r->read == r->write);
 }
 
-static inline bool ring_almost_full(const struct mgc_ring *r)
+static inline bool ring_full(const struct mgc_ring *r)
 {
-	return !!(ring_free_count(r) < RING_ALMOST_FULL);
+	return !!(ring_free_count(r) == MGC_DATASLOT_SIZE);
 }
 
 static inline void ring_write_next(struct mgc_ring *r, size_t size)
 {
-//	r->write += ALIGN(size, 4);
-	r->write += size;
-	if (r->write >= r->end) {
-		r->write = r->start;
+	uint8_t *wr = r->write;
+
+	wr += size;
+	if (wr >= r->end) {
+		wr = r->start;
 	}
+	r->write = wr;
 }
 
 static inline void ring_read_next(struct mgc_ring *r, size_t size)
 {
-//	r->read += ALIGN(size, 4);
-	r->read += size;
-	if (r->read >= r->end) {
-		r->read = r->start;
+	uint8_t *rd = r->read;
+
+	rd += size;
+	if (rd >= r->end) {
+		rd = r->start;
 	}
+	r->read = rd;
 }
 
 int mgc_ring_malloc(struct mgc_ring *, int cpu);
