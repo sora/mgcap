@@ -12,7 +12,7 @@
 #include "mgcap_rx.h"
 #include "mgcap_netlink.h"
 
-#define MGCAP_VERSION  "0.1.0"
+#define MGCAP_VERSION  "0.1.1"
 
 #define IOCTL_DEBUG_ENABLE    10
 #define IOCTL_DEBUG_DISABLE   11
