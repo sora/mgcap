@@ -7,80 +7,46 @@ static int caught_signal = 0;
 //	.packet_count = 0,
 //};
 
-// SHB
-#define BT_SHB                  0x0A0D0D0A
-#define BYTE_ORDER_MAGIC        0x1A2B3C4D
-#define PCAP_NG_VERSION_MAJOR	1
-#define PCAP_NG_VERSION_MINOR	0
-static struct section_header_block pcapng_shb_hdr = {
-	.block_type       = BT_SHB,
-	.total_length1    = sizeof(struct section_header_block),
-	.byte_order_magic = BYTE_ORDER_MAGIC,
-	.major_version    = PCAP_NG_VERSION_MAJOR,
-	.minor_version    = PCAP_NG_VERSION_MINOR,
-	.section_length   = 0xffffffffffffffff,
-	.total_length2    = sizeof(struct section_header_block),
+// pcap global header
+#define PCAP_MAGIC         (0xa1b2c3d4)
+#define PCAP_MAGIC_NS      (0xa1b23c4d)
+#define PCAP_VERSION_MAJOR (0x2)
+#define PCAP_VERSION_MINOR (0x4)
+#define PCAP_SNAPLEN       (0xFFFF)
+#define PCAP_NETWORK       (0x1)      // linktype_ethernet
+static struct pcap_hdr_s pcap_ghdr = {
+	.magic_number     = PCAP_MAGIC_NS,
+	.version_major    = PCAP_VERSION_MAJOR,
+	.version_minor    = PCAP_VERSION_MINOR,
+	.thiszone         = 0,
+	.sigfigs          = 0,
+	.snaplen          = PCAP_SNAPLEN,
+	.network          = PCAP_NETWORK,
 };
 
-// IDB
-#define BT_IDB            0x00000001
-#define IF_TSRESOL        9         /* interface's time stamp resolution */
-#define IF_FCSLEN         13        /* FCS length for this interface */
-static struct interface_description_block pcapng_idb_hdr = {
-	.block_type             = BT_IDB,
-	.total_length1          = sizeof(struct interface_description_block),
-	.linktype               = 0x01,
-	.reserved               = 0,
-	.snaplen                = 0xffff,
-	.option_code_fcslen     = IF_FCSLEN,
-	.option_length_fcslen   = 1,
-	.option_value_fcslen    = 4,
-	.option_code_tsresol    = IF_TSRESOL,
-	.option_length_tsresol  = 1,
-	.option_value_tsresol   = 9,
-	.option_code_pad        = 0,
-	.option_length_pad      = 0,
-	.total_length2          = sizeof(struct interface_description_block),
-};
-
-
-static inline int pcapng_epb_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
+#define _NSEC_PER_SEC 1000000000
+static inline int pcap_memcpy(char *po, char *pi, int pktlen, uint64_t ts)
 {
-	size_t epb_head_size = sizeof(struct enhanced_packet_block_head);
-	size_t epb_tail_size = sizeof(struct enhanced_packet_block_tail);
-	struct enhanced_packet_block_head epb_head;
-	struct enhanced_packet_block_tail epb_tail;
-	uint32_t epb_len, pad;
+	struct pcaprec_hdr_s pcaprec = {0};
 	int copy_len;
 
 	copy_len = (pktlen > 96) ? 96 : pktlen;
 
-	pad = 4 - (copy_len % 4);
-	if (pad == 4)
-		pad = 0;
+	// pcaprec header
+	if (ts == 0) {
+		pcaprec.ts_sec  = 0;
+		pcaprec.ts_nsec = 0;
+	} else {
+		pcaprec.ts_sec  = (unsigned int)(ts / _NSEC_PER_SEC);
+		pcaprec.ts_nsec = (unsigned int)(ts % _NSEC_PER_SEC);
+	}
+	pcaprec.incl_len = copy_len;
+	pcaprec.orig_len = pktlen;
 
-	epb_len = epb_head_size + epb_tail_size + copy_len + pad;
+	memcpy(po, &pcaprec, sizeof(struct pcaprec_hdr_s));
+	memcpy((po + sizeof(struct pcaprec_hdr_s)), (pi + MGC_HDRLEN), (size_t)copy_len);
 
-	//printf("epb_len=%d, snaplen=%d, pktlen=%d, copy_len=%d\n", epb_len, MGC_SNAPLEN, pktlen, copy_len);
-	//printf("pad=%d, epb_head_size=%d, epb_tail_size=%d\n", pad, (int)epb_head_size, (int)epb_tail_size);
-
-	// epb_head
-	epb_head.block_type      = BT_EPB;
-	epb_head.total_length    = epb_len;
-	epb_head.interface_id    = 0;
-	epb_head.timestamp_high  = (uint32_t)(ts >> 32);
-	epb_head.timestamp_low   = (uint32_t)(ts & 0xFFFFFFFF);
-	epb_head.caplen          = copy_len;
-	epb_head.origlen         = pktlen;
-
-	// epb_tail
-	epb_tail.total_length = epb_len;
-
-	memcpy(po, &epb_head, epb_head_size);
-	memcpy((po + epb_head_size), (pi + MGC_HDRLEN), (size_t)copy_len);
-	memcpy((po + epb_head_size + (size_t)copy_len), &epb_tail, epb_tail_size);
-
-	return epb_len;
+	return (sizeof(struct pcaprec_hdr_s) + copy_len);
 }
 
 
@@ -155,16 +121,9 @@ void *rx_thread(void *arg)
 	}
 
 	// dump BT_SHB to pcap file
-	count = write(fdo, &pcapng_shb_hdr, sizeof(struct section_header_block));
-	if (count != sizeof(struct section_header_block)) {
-		fprintf(stderr, "cannot write output file: BT_SHB\n");
-		return NULL;
-	}
-
-	// dump BT_IDB to pcap file
-	count = write(fdo, &pcapng_idb_hdr, sizeof(struct interface_description_block));
-	if (count != sizeof(struct interface_description_block)) {
-		fprintf(stderr, "cannot write output file: BT_IDB\n");
+	count = write(fdo, &pcap_ghdr, sizeof(struct pcap_hdr_s));
+	if (count != sizeof(struct pcap_hdr_s)) {
+		fprintf(stderr, "cannot write output file: pcap_hdr_s\n");
 		return NULL;
 	}
 
@@ -198,7 +157,7 @@ void *rx_thread(void *arg)
 				printf("format size: pktlen %X\n", pktlen);
 				break;
 			}
-			copy_len = pcapng_epb_memcpy(po, pi, pktlen, tstamp);
+			copy_len = pcap_memcpy(po, pi, pktlen, tstamp);
 			pi += MGC_SLOTLEN;
 			po += copy_len;
 			copy_sum += copy_len;
