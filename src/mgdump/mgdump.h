@@ -20,54 +20,30 @@
 #define MGC_SLOTLEN         128
 #define INTERVAL_100USEC    100
 
-/* PCAP-NG header
- * from https://github.com/the-tcpdump-group/libpcap */
+/* PCAP header
+ * from https://wiki.wireshark.org/Development/LibpcapFileFormat */
 
-/* Section Header Block. */
-struct section_header_block {
-	uint32_t block_type;
-	uint32_t total_length1;
-	uint32_t byte_order_magic;
-	uint16_t major_version;
-	uint16_t minor_version;
-	uint64_t section_length;
-	uint32_t total_length2;
+/* pcap v2.4 global header */
+struct pcap_hdr_s {
+	unsigned int   magic_number;   /* magic number */
+	unsigned short version_major;  /* major version number */
+	unsigned short version_minor;  /* minor version number */
+	int            thiszone;       /* GMT to local correction */
+	unsigned int   sigfigs;        /* accuracy of timestamps */
+	unsigned int   snaplen;        /* max length of captured packets, in octets */
+	unsigned int   network;        /* data link type */
 } __attribute__((packed));
 
-/* Interface Description Block. */
-struct interface_description_block {
-	uint32_t block_type;
-	uint32_t total_length1;
-	uint16_t linktype;
-	uint16_t reserved;
-	uint32_t snaplen;
-	uint16_t option_code_fcslen;
-	uint16_t option_length_fcslen;
-	uint32_t option_value_fcslen;
-	uint16_t option_code_tsresol;
-	uint16_t option_length_tsresol;
-	uint32_t option_value_tsresol;
-	uint16_t option_code_pad;
-	uint16_t option_length_pad;
-	uint32_t total_length2;
+/* pcap v2.4 packet header */
+struct pcaprec_hdr_s {
+	unsigned int ts_sec;         /* timestamp seconds */
+	union {
+		unsigned int ts_usec;        /* timestamp microseconds */
+		unsigned int ts_nsec;        /* timestamp nanoseconds */
+	};
+	unsigned int incl_len;       /* number of octets of packet saved in file */
+	unsigned int orig_len;       /* actual length of packet */
 } __attribute__((packed));
-
-/* Enhanced Packet Block. */
-#define BT_EPB			0x00000006
-struct enhanced_packet_block_head {
-	uint32_t block_type;
-	uint32_t total_length;
-	uint32_t interface_id;
-	uint32_t timestamp_high;
-	uint32_t timestamp_low;
-	uint32_t caplen;
-	uint32_t origlen;
-	/* followed by packet data, options, and trailer */
-} __attribute__((packed));
-
-struct enhanced_packet_block_tail {
-	uint32_t total_length;
-};
 
 struct mgdump_statistics {
 	uint32_t packet_count;
