@@ -238,7 +238,7 @@ int main(int argc, char **argv)
 	pthread_t *rxth;
 
 	cpu_set_t cpu_set;
-	int ncpus, ret, i, fdi;
+	int ncpus, ret, i, fdi[0x40] = {};
 	unsigned int sum, pre_sum;
 
 	char ifname[11 + IFNAMSIZ];
@@ -254,13 +254,6 @@ int main(int argc, char **argv)
 	}
 	strcpy(ifname, argv[1]);
 
-	fdi = open(ifname, O_RDONLY);
-	if (fdi < 0) {
-		fprintf(stderr, "cannot open mgcap device\n");
-		return 1;
-	}
-	printf("mgdump: listening on %s\n", ifname);
-	
 	// malloc pthread
 	rxth = calloc(sizeof(pthread_t), ncpus);
 	if (rxth == NULL) {
@@ -277,8 +270,15 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < CPU_SETSIZE; i++) {
 		if (CPU_ISSET(i, &cpu_set)) {
+			fdi[i] = open(ifname, O_RDONLY);
+			if (fdi < 0) {
+				fprintf(stderr, "cannot open mgcap device\n");
+				return 1;
+			}
+			printf("mgdump: listening on %s from cpu%d\n", ifname, i);
+
 			thdata[i].cpu = i;
-			thdata[i].fdi = fdi;
+			thdata[i].fdi = fdi[i];
 			thdata[i].ncpus = ncpus;
 			thdata[i].stat_pktcount = 0;
 			sem_init(&thdata[i].ready, 0, 0);
@@ -321,7 +321,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	close(fdi);
+	for (i = 0; i < 0x40; i++) {
+		if (fdi[i])
+			close(fdi[i]);
+	}
 
 	free(thdata);
 	free(rxth);
